@@ -84,13 +84,13 @@ func TestOperations(t *testing.T) {
 	}
 }
 
-func TestMethodNotAllowedOnOperation(t *testing.T) {
+func TestOperationRejectsGet(t *testing.T) {
 	r := NewRouter(nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/add", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
-	if w.Code != http.StatusNotFound && w.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want 404 or 405", w.Code)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", w.Code)
 	}
 }
 

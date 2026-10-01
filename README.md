@@ -17,8 +17,20 @@ A full-stack calculator: a React + TypeScript frontend that consumes a Go REST A
 .
 ├── backend/     # Go REST API (Gin), independently buildable and runnable
 ├── frontend/    # React + TypeScript (Vite), independently buildable and runnable
+├── .github/     # Pull request template
 ├── README.md
-└── PROMPTS.md   # AI prompts used while building this project
+├── PROMPTS.md   # AI prompts used while building this project
+└── TODO.md      # Working checklist: pending work and contract details not to forget
+```
+
+Backend layout:
+
+```
+backend/
+├── cmd/server/          # entrypoint: configuration, wiring, graceful shutdown
+└── internal/
+    ├── calculator/      # pure domain logic (no HTTP, no Gin)
+    └── api/             # Gin layer: routing, validation, error mapping
 ```
 
 Each side has its own `Dockerfile`, so the frontend and the backend can be built and run separately or together.
@@ -92,14 +104,30 @@ _TBD_ — how to run the tests and produce coverage reports for both layers.
 
 ## Design decisions
 
-_TBD_ — to be written as decisions land. Decisions taken so far:
+Decisions taken so far (more will be added as the remaining branches land).
+
+### Architecture
 
 - **Monorepo, independent deployables.** `backend/` and `frontend/` share nothing but the HTTP contract.
-- **Exact decimal arithmetic.** Numbers travel as JSON strings and are computed with decimals, so `0.1 + 0.2` is exactly `0.3`.
-- **Domain separated from transport.** The calculation logic knows nothing about HTTP or Gin; the API layer only translates requests into domain calls and domain errors into HTTP responses.
+- **Domain separated from transport.** The calculation logic (`internal/calculator`) knows nothing about HTTP or Gin; the API layer (`internal/api`) only translates requests into domain calls and domain errors into HTTP responses. Gin is confined to the API layer.
+- **Idiomatic Go, no framework ceremony.** No dependency injection container or repository layer: there is no state to manage. Dependencies are passed explicitly.
+- **Same-origin first, CORS as a fallback.** In development the Vite dev server proxies `/api`, and in Docker the frontend's nginx proxies it, so the browser sees a single origin. CORS stays available through `CORS_ALLOWED_ORIGINS` for deployments where the two sides live on different origins, and is off by default.
+- **Dependency pinning.** Gin `v1.10.1` and `gin-contrib/cors` `v1.7.3` are pinned because newer Gin releases raise the `go` directive in `go.mod` to `1.26`; the project targets Go 1.23.
+
+### Numeric precision (the string contract)
+
+- **Exact decimal arithmetic.** The backend computes with `shopspring/decimal`, so `0.1 + 0.2` is exactly `0.3`, which binary floating point cannot do.
+- **Numbers travel as JSON strings, in both directions.** A JSON number would be parsed into a float64 by most clients (including `JSON.parse` in the browser) and the precision would be lost before it reaches the API. Sending a JSON number instead of a string is rejected with `400 invalid_request`.
+- **Strict operand format.** Operands must match `^-?\d+(\.\d+)?$` and be at most 64 characters: no `+` sign, no `.5` or `5.`, no exponent notation. Exponent notation is rejected on purpose because `"1e999999999"` is tiny on the wire but can make the decimal library allocate huge numbers.
+- **Division rounds to 16 decimal places.** `1/3` returns `0.3333333333333333`. Results are returned without trailing zeros.
+- **Consequences for the frontend.** The frontend must never convert operands or results with `Number()`, `parseFloat` or arithmetic: values live as strings from the keypad to the display and the request. It also has to normalize what the user types into the accepted format (for example `.5` becomes `0.5`, `5.` becomes `5`) and cap the input length. Tracked in [TODO.md](TODO.md).
+
+### API design
+
 - **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (and later `/power`, `/sqrt`, `/percentage`). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
 - **`POST` with a JSON body, not `GET`.** Operands are decimal strings, which are cleaner in a body than in a query string.
-- **Thin, explicit routing.** The domain exposes pure functions in two shapes (binary and unary). The router maps each route to one of two generic handlers, so adding an operation is one domain function plus one route line.
+- **Thin, explicit routing.** The domain exposes pure functions with the same shape per arity. The router maps each route to a generic handler, so adding an operation is one domain function plus one route line. Only the binary handler exists today; the unary one arrives with the first unary operation (`sqrt`).
+- **Two classes of failure, two status codes.** `400` means the request itself is malformed (bad JSON, missing or invalid operand); `422` means it is well formed but mathematically impossible (division by zero). Every error has the same `{"error": {"code", "message"}}` body, and clients should branch on `code`, not on `message`.
 
 ## Workflow
 
