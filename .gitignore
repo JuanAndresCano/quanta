@@ -1,0 +1,24 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Backend (Go)
+backend/bin/
+backend/coverage.out
+backend/coverage.html
+*.test
+*.out
+
+# Frontend (Node)
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.log
