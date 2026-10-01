@@ -2,8 +2,6 @@
 
 A full-stack calculator: a React + TypeScript frontend that consumes a Go REST API.
 
-> **Status:** work in progress. This README grows with each feature branch; sections marked _TBD_ are filled in as the corresponding feature lands.
-
 ## Scope
 
 | Operation | Priority |
@@ -16,12 +14,13 @@ A full-stack calculator: a React + TypeScript frontend that consumes a Go REST A
 
 ```
 .
-├── backend/     # Go REST API (Gin), independently buildable and runnable
-├── frontend/    # React + TypeScript (Vite), independently buildable and runnable
-├── .github/     # Pull request template
+├── backend/              # Go REST API (Gin), independently buildable and runnable
+├── frontend/             # React + TypeScript (Vite), served by nginx in Docker
+├── e2e/                  # End-to-end tests against the Docker stack
+├── .github/              # CI workflow and pull request template
+├── docker-compose.yml    # Runs backend and frontend together
 ├── README.md
-├── PROMPTS.md   # AI prompts used while building this project
-└── TODO.md      # Working checklist: pending work and contract details not to forget
+└── PROMPTS.md            # AI prompts used while building this project
 ```
 
 Backend layout:
@@ -34,17 +33,63 @@ backend/
     └── api/             # Gin layer: routing, validation, error mapping
 ```
 
+Frontend layout:
+
+```
+frontend/src/
+├── calculator/   # pure state machine: types, reducer, operand and display helpers
+├── api/          # fetch client for the backend
+├── hooks/        # useCalculator: connects the reducer to the API client
+└── components/   # Display, Keypad, Key
+```
+
 Each side has its own `Dockerfile`, so the frontend and the backend can be built and run separately or together.
 
 ## Tech stack
 
-- **Backend:** Go, Gin, `shopspring/decimal` for exact decimal arithmetic
-- **Frontend:** React, TypeScript, Vite, Vitest + Testing Library
-- **Packaging:** Docker (one image per side, plus a compose file to run both)
+- **Backend:** Go 1.23, Gin, `shopspring/decimal` for exact decimal arithmetic
+- **Frontend:** React 19, TypeScript, Vite, oxlint, Vitest + Testing Library (jsdom)
+- **Packaging:** Docker (one image per side, nginx in front of the app, plus a compose file to run both)
+- **CI:** GitHub Actions
 
 ## Getting started
 
-_TBD_ — setup, running the backend, running the frontend, and running with Docker.
+Requirements: Go 1.23+ and Node 22+ to run the code directly, or just Docker to run everything in containers.
+
+### With Docker (one command)
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:3000. Details in "Run everything with Docker Compose" below.
+
+### For development
+
+Run the two sides in separate terminals:
+
+```bash
+# Terminal 1: the API on http://localhost:8080
+cd backend
+go run ./cmd/server
+
+# Terminal 2: the UI on http://localhost:5173
+cd frontend
+npm ci
+npm run dev
+```
+
+The Vite dev server proxies `/api` to `localhost:8080`, so the browser sees a single origin and no CORS configuration is needed.
+
+Frontend scripts (run from `frontend/`):
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Dev server with hot reload and the `/api` proxy |
+| `npm run build` | Type-check and production build into `dist/` |
+| `npm run lint` | oxlint |
+| `npm test` | Unit and component tests (Vitest) |
+| `npm run test:coverage` | The same tests with a coverage summary |
 
 ## API
 
@@ -151,7 +196,39 @@ Set `E2E_BASE_URL` to test another address (default `http://localhost:3000`).
 
 ## Testing and coverage
 
-_TBD_ — how to run the tests and produce coverage reports for both layers.
+There are three layers of tests. All of them run in CI.
+
+| Layer | What it checks | Command |
+|---|---|---|
+| Backend | Table-driven domain tests (exact decimals, edge cases) and API tests through `httptest` (status codes, error contract, validation) | `cd backend && go test ./...` |
+| Frontend | The state machine as table-driven tests, the API client over a mocked `fetch`, and the whole UI with Testing Library | `cd frontend && npm test` |
+| End to end | The real Docker stack through nginx (see above) | `node --test "e2e/*.test.mjs"` |
+
+### Coverage
+
+Generate the reports locally; none of them is committed (`coverage.out`, `coverage.html` and `frontend/coverage/` are git-ignored).
+
+```bash
+# Backend: per-function summary, plus an HTML view if you want one
+cd backend
+go test -coverprofile=coverage.out ./...
+go tool cover -func=coverage.out
+go tool cover -html=coverage.out
+
+# Frontend: summary printed in the terminal
+cd frontend
+npm run test:coverage
+```
+
+Summary of the last run:
+
+| Part | Coverage |
+|---|---|
+| Backend `internal/calculator` (domain) | 95.0% of statements |
+| Backend `internal/api` (HTTP layer) | 89.3% of statements |
+| Frontend (`src/`) | 99.3% statements, 99.2% branches, 100% functions, 100% lines |
+
+`backend/cmd/server` (`main`: configuration, wiring and graceful shutdown) has no unit tests, which is why the backend total over all packages is 69.0%; it is exercised by the end-to-end tests and by the container healthcheck. In the HTTP layer the uncovered code is the `500` fallback for unexpected errors.
 
 ## Continuous integration
 
@@ -165,7 +242,7 @@ To make them mandatory, require the `backend`, `frontend` and `docker` status ch
 
 ## Design decisions
 
-Decisions taken so far (more will be added as the remaining branches land).
+The main decisions and the reasons behind them.
 
 ### Architecture
 
@@ -181,7 +258,7 @@ Decisions taken so far (more will be added as the remaining branches land).
 - **Numbers travel as JSON strings, in both directions.** A JSON number would be parsed into a float64 by most clients (including `JSON.parse` in the browser) and the precision would be lost before it reaches the API. Sending a JSON number instead of a string is rejected with `400 invalid_request`.
 - **Strict operand format.** Operands must match `^-?\d+(\.\d+)?$` and be at most 64 characters: no `+` sign, no `.5` or `5.`, no exponent notation. Exponent notation is rejected on purpose because `"1e999999999"` is tiny on the wire but can make the decimal library allocate huge numbers.
 - **Division rounds to 16 decimal places.** `1/3` returns `0.3333333333333333`. Results are returned without trailing zeros.
-- **Consequences for the frontend.** The frontend must never convert operands or results with `Number()`, `parseFloat` or arithmetic: values live as strings from the keypad to the display and the request. It also has to normalize what the user types into the accepted format (for example `.5` becomes `0.5`, `5.` becomes `5`) and cap the input length. Tracked in [TODO.md](TODO.md).
+- **Consequences for the frontend.** The frontend must never convert operands or results with `Number()`, `parseFloat` or arithmetic: values live as strings from the keypad to the display and the request. It also has to normalize what the user types into the accepted format (for example `.5` becomes `0.5`, `5.` becomes `5`) and cap the input length.
 
 ### API design
 
@@ -189,6 +266,36 @@ Decisions taken so far (more will be added as the remaining branches land).
 - **`POST` with a JSON body, not `GET`.** Operands are decimal strings, which are cleaner in a body than in a query string.
 - **Thin, explicit routing.** The domain exposes pure functions with the same shape per arity. The router maps each route to a generic handler, so adding an operation is one domain function plus one route line. Binary operations take `{a, b}` and unary ones take `{value}`, each with its own generic handler.
 - **Two classes of failure, two status codes.** `400` means the request itself is malformed (bad JSON, missing or invalid operand); `422` means it is well formed but mathematically impossible (division by zero). Every error has the same `{"error": {"code", "message"}}` body, and clients should branch on `code`, not on `message`.
+
+### Operations
+
+- **`percentage` is exact.** `value / 100` is computed by shifting the decimal point (`Shift(-2)`), so it never rounds, unlike a division.
+- **`power` only uses what the decimal library offers.** It relies on `PowInt32`, with no hand-written numeric algorithm. The exponent must be an integer with `|b| <= 1000`, otherwise `422 invalid_exponent`. The library fails on `0^0` (reported as `invalid_exponent`) and would divide by zero for `0` to a negative power, so that case is guarded before the call and reported as `division_by_zero`. A negative exponent is rounded to 16 decimal places, like a division. The worst allowed input (a 64-digit base to the power of 1000) answers in milliseconds.
+- **Square root is not built.** `shopspring/decimal` has no native `Sqrt`, and a hand-written algorithm (for example Newton-Raphson) was ruled out to keep the scope small and the arithmetic delegated to the library. Adding it would take a domain function, a `422` for negative input, a unary route and a key.
+
+### Frontend
+
+- **The calculator is a pure state machine.** The reducer never calls the API: when an operation must be computed it leaves a `pending` request in the state, and the `useCalculator` hook sends it and dispatches the answer. This keeps the interaction rules testable as plain tables, with no mocks and no timers.
+- **Strings from the keypad to the request.** The state, the display and the requests hold strings only; nothing is converted to a JS number. Typing is capped at 12 digits, and a result longer than 64 characters that is reused as an operand shows "Number too long" instead of calling the backend.
+- **Left-to-right chaining, like iOS.** `2 + 3 ×` computes `2 + 3` before applying the `×`, and `2 + =` computes `2 + 2`. Two operators in a row replace each other.
+- **The keypad locks while a request is in flight.** Only AC works: it aborts the request, and a late answer is ignored.
+- **`%` acts on the display and keeps the pending operator.** `200 + 10 % =` is `200.1`. It is not the iOS behavior, where the percentage is relative to the first operand.
+- **`xʸ` has its own full-width row**, because the iOS keypad has no room for a power key.
+- **Errors are branched on `error.code`.** Each code has a friendly message. Any response that is not the backend's own error body (a gateway error, an HTML page, an empty body) or a failed request is shown as "Cannot reach the server". There are no client timeouts or retries: the user cancels with AC.
+
+### Docker and nginx
+
+- **Multi-stage builds and no root.** The backend is a static binary on `alpine` (16 MB); the frontend is the Vite build served by `nginx-unprivileged` (55 MB). Both run as a non-root user and declare a healthcheck.
+- **nginx serves the app and proxies `/api`.** The backend address is `BACKEND_URL`. nginx resolves it at startup, so the frontend image on its own needs a resolvable value. A `proxy_connect_timeout` of 5 seconds makes it fail fast when the backend is unreachable instead of waiting for nginx's 60 second default.
+- **Cache policy.** Hashed files under `/assets/` are cached for a year; `index.html` is never cached.
+- **Compose publishes only the frontend** (port 3000) and starts it after the backend is healthy.
+
+### Known limitations
+
+- Square root is not built (see "Operations").
+- `±` pressed right after choosing an operator only changes the display, and after `%` a new operator replaces the pending one instead of evaluating.
+- A result of around 24 digits is wider than a phone screen; the display scrolls horizontally instead of shrinking further.
+- There is no authentication or rate limiting, which is out of scope for a calculator.
 
 ## Workflow
 
