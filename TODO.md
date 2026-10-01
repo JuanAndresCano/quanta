@@ -7,7 +7,7 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
 - One `feat/*` branch per mission; it is ready for a PR when its "done" criteria are met. `main` is protected and merged branches are deleted automatically.
 - Git is handled by the repository owner, never by the AI assistant.
 - Coverage: only a textual summary plus the commands to generate it go in the README. **Never commit HTML reports or generated coverage folders** (already covered by `.gitignore`; keep it that way).
-- Environment (WSL2 and Docker) is outside the scope of the project: if it breaks, the owner restarts it.
+- Environment (the local setup and Docker) is outside the scope of the project: if it breaks, the owner restarts it.
 
 ## Branches
 
@@ -15,15 +15,19 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
 - [x] `feat/backend-calculator-core`
 - [x] `feat/backend-api`
 - [x] `feat/backend-docker`
-- [ ] `feat/frontend-ui`: iOS-style keypad, display and state, no real backend yet
+- [x] `feat/frontend-ui`: iOS-style keypad, display and state, no real backend yet
   - [x] Pure reducer (`src/calculator/`) with table-driven tests
   - [x] `useCalculator` hook: sends the `pending` request, dispatches `resolve` / `fail`, aborts on AC and ignores stale answers
   - [x] Components (`Display`, `Keypad`, `Key`), iOS styling, responsive layout
   - [x] Display formatting (`format.ts`): thousands separators and font shrinking, display only
   - [x] Component tests (Vitest + Testing Library + jsdom)
   - [x] Remove the Vite template content (`App.tsx`, CSS, assets)
-  - [ ] Temporary `stubCalculate` (`src/api/stubClient.ts`, always answers `42`) is replaced by the real client in `feat/frontend-api-integration`
+  - [x] Temporary `stubCalculate` (always answered `42`), replaced by the real client in `feat/frontend-api-integration`
 - [ ] `feat/frontend-api-integration`: API client, loading and error handling against the real backend, Vite proxy for `/api`
+  - [x] `apiCalculate` (`src/api/client.ts`) with unit tests over a mocked `fetch`
+  - [x] `App` uses the real client; `stubClient.ts` removed
+  - [x] Vite dev proxy `/api` to `localhost:8080`
+  - [x] Verified in the browser against the real backend (success, `1/0`, long decimals, backend down)
 - [ ] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
 - [ ] `feat/advanced-operations`: see "Advanced operations" below
 - [ ] `feat/ci`: GitHub Actions workflow
@@ -34,14 +38,14 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
 The API takes and returns numbers as strings (see "Numeric precision" in the README). The frontend has to be strict about it:
 
 - [x] Never use `Number()`, `parseFloat`, `+value` or JS arithmetic on operands or results (reducer: values are strings end to end, covered by tests).
-- [ ] Send operands as JSON **strings** (`{"a": "0.1", "b": "0.2"}`); a JSON number is rejected with `400 invalid_request`. (API client)
+- [x] Send operands as JSON **strings** (`{"a": "0.1", "b": "0.2"}`); a JSON number is rejected with `400 invalid_request`. (`apiCalculate`, covered by tests)
 - [x] Normalize input to the accepted format `^-?\d+(\.\d+)?$` before sending: `.5` becomes `0.5`, `5.` becomes `5`, `-0` becomes `0` (`normalizeOperand`).
 - [x] Cap the number of digits the user can type (`MAX_DIGITS = 12`).
 - [x] Results longer than 64 characters: reusing one as an operand shows `operand_too_long` instead of calling the backend.
 - [x] Format only for display (thousands separators, shrinking the font), never for the value that is kept and sent.
-- [ ] Branch on `error.code`, not on `error.message`: `invalid_request`, `invalid_operand` (`400`), `division_by_zero` (`422`), `internal_error` (`500`), plus client-side `network_error` and `operand_too_long`. Show a friendly message for each.
-- [ ] Division results arrive rounded to 16 decimal places without trailing zeros; make sure the display handles long decimals.
-- [ ] Add a test that proves `0.1 + 0.2` reaches the display as `0.3` through the API client.
+- [x] Branch on `error.code`, not on `error.message`: `invalid_request`, `invalid_operand` (`400`), `division_by_zero` (`422`), `internal_error` (`500`), plus client-side `network_error` and `operand_too_long`. Show a friendly message for each.
+- [x] Division results arrive rounded to 16 decimal places without trailing zeros; the display handles long decimals (`0.3333333333333333` fits at 390 px; a 24-digit product scrolls horizontally).
+- [x] Add a test that proves `0.1 + 0.2` reaches the display as `0.3` through the API client.
 
 ## Advanced operations
 
@@ -75,7 +79,7 @@ Whatever the route, the work would be: domain function, `422` with its own code 
 - [x] Backend image: multi-stage, non-root, 16 MB, healthcheck, graceful stop.
 - [ ] Frontend image: nginx serves the build and proxies `/api` to the backend service; backend URL configurable.
 - [ ] `docker compose up` runs both; each image also builds and runs on its own.
-- [ ] Vite dev server proxies `/api` to `localhost:8080`.
+- [x] Vite dev server proxies `/api` to `localhost:8080`.
 
 ## CI (`feat/ci`)
 

@@ -1,4 +1,4 @@
-import { stubCalculate } from './api/stubClient'
+import { apiCalculate } from './api/client'
 import type { CalculateFn } from './calculator/types'
 import { Display } from './components/Display'
 import { Keypad } from './components/Keypad'
@@ -9,7 +9,7 @@ interface AppProps {
   calculate?: CalculateFn
 }
 
-export default function App({ calculate = stubCalculate }: AppProps) {
+export default function App({ calculate = apiCalculate }: AppProps) {
   const [state, dispatch] = useCalculator(calculate)
 
   return (

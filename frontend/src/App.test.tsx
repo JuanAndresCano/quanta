@@ -1,7 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { apiCalculate } from './api/client'
 import { CalculationError } from './calculator/errors'
 import type { CalculateFn } from './calculator/types'
 
@@ -181,5 +182,63 @@ describe('errors', () => {
 
     await press('8')
     expect(display()).toHaveTextContent('8')
+  })
+})
+
+describe('through the API client', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  function stubBackend(status: number, body: unknown) {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  it('shows 0.1 + 0.2 as 0.3, sending the operands as JSON strings', async () => {
+    const fetchMock = stubBackend(200, { result: '0.3' })
+    const { press, display } = setup(apiCalculate)
+
+    await press('0', '.', '1', '+', '0', '.', '2', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('0.3'))
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/add')
+    expect(init.body).toBe('{"a":"0.1","b":"0.2"}')
+  })
+
+  it('shows a 16-decimal division result untouched', async () => {
+    stubBackend(200, { result: '0.3333333333333333' })
+    const { press, display } = setup(apiCalculate)
+
+    await press('1', '/', '3', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('0.3333333333333333'))
+  })
+
+  it('shows the friendly message for a 422 division_by_zero', async () => {
+    stubBackend(422, { error: { code: 'division_by_zero', message: 'division by zero' } })
+    const { press, display } = setup(apiCalculate)
+
+    await press('1', '/', '0', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('Cannot divide by zero'))
+  })
+
+  it('shows "Cannot reach the server" when the request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+    const { press, display } = setup(apiCalculate)
+
+    await press('1', '+', '1', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('Cannot reach the server'))
   })
 })

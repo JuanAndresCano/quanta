@@ -34,3 +34,11 @@ AI tooling (Claude Code) was used while building this project. This file records
 - Accepted a deliberate simplification: `±` pressed right after choosing an operator only changes the display.
 - Built the `useCalculator` hook (aborts the request on AC, ignores stale answers), the iOS-style keypad and display, display-only number formatting, and component tests with Testing Library.
 - Parked square root: `shopspring/decimal` has no native `Sqrt`, so it stays out of scope unless time remains after `percentage` and `power`.
+
+## `feat/frontend-api-integration`
+
+- Planned the branch first: a thin `fetch` client behind the existing `CalculateFn`, so the reducer, hook and components stay untouched.
+- Decided the error mapping: branch on the backend `error.code` (never the message), treat an unknown code as `internal_error`, and any response without the backend's error envelope (proxy 502, HTML, empty body) as `network_error`. No timeout or retries: AC already cancels a request.
+- Wrote the client test-first over a mocked `fetch` (request shape, string operands, every error code, malformed bodies), plus component tests that run the real client end to end for `0.1 + 0.2`, `1 / 3`, `1 / 0` and a failed request.
+- Added the Vite dev proxy for `/api` and removed the temporary stub.
+- Verified against the real backend in the browser: results, chaining, division by zero, recovery, and "Cannot reach the server" with the backend stopped.
