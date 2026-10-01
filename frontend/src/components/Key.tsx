@@ -6,19 +6,19 @@ interface KeyProps {
   onPress: () => void
   /** Accessible name when the visible label is only a symbol. */
   ariaLabel?: string
-  /** The `0` key spans two columns. */
+  /** Spans two columns (the `0` key). */
   wide?: boolean
-  /** Spans the whole row (the `xʸ` key). */
-  full?: boolean
+  /** Half of the short top row (the `√` and `xʸ` keys). */
+  slim?: boolean
   /** Highlights the operator that is waiting for its second operand. */
   active?: boolean
   disabled?: boolean
 }
 
-export function Key({ label, variant, onPress, ariaLabel, wide, full, active, disabled }: KeyProps) {
+export function Key({ label, variant, onPress, ariaLabel, wide, slim, active, disabled }: KeyProps) {
   const classes = ['key', `key--${variant}`]
   if (wide) classes.push('key--wide')
-  if (full) classes.push('key--full')
+  if (slim) classes.push('key--slim')
   if (active) classes.push('key--active')
 
   return (

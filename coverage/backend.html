@@ -59,17 +59,19 @@
 				
 				<option value="file1">github.com/JuanAndresCano/quanta/backend/internal/api/dto.go (100.0%)</option>
 				
-				<option value="file2">github.com/JuanAndresCano/quanta/backend/internal/api/handler.go (83.3%)</option>
+				<option value="file2">github.com/JuanAndresCano/quanta/backend/internal/api/handler.go (86.7%)</option>
 				
 				<option value="file3">github.com/JuanAndresCano/quanta/backend/internal/api/router.go (100.0%)</option>
 				
-				<option value="file4">github.com/JuanAndresCano/quanta/backend/internal/api/unary.go (85.7%)</option>
+				<option value="file4">github.com/JuanAndresCano/quanta/backend/internal/api/unary.go (100.0%)</option>
 				
 				<option value="file5">github.com/JuanAndresCano/quanta/backend/internal/calculator/basic.go (100.0%)</option>
 				
 				<option value="file6">github.com/JuanAndresCano/quanta/backend/internal/calculator/power.go (92.3%)</option>
 				
-				<option value="file7">github.com/JuanAndresCano/quanta/backend/internal/calculator/unary.go (100.0%)</option>
+				<option value="file7">github.com/JuanAndresCano/quanta/backend/internal/calculator/sqrt.go (100.0%)</option>
+				
+				<option value="file8">github.com/JuanAndresCano/quanta/backend/internal/calculator/unary.go (100.0%)</option>
 				
 				</select>
 			</div>
@@ -162,14 +164,17 @@ import (
 
 // Error codes returned in the API error body.
 const (
-        codeInvalidRequest  = "invalid_request"
-        codeInvalidOperand  = "invalid_operand"
-        codeDivisionByZero  = "division_by_zero"
-        codeInvalidExponent = "invalid_exponent"
-        codeInternal        = "internal_error"
+        codeInvalidRequest     = "invalid_request"
+        codeInvalidOperand     = "invalid_operand"
+        codeDivisionByZero     = "division_by_zero"
+        codeInvalidExponent    = "invalid_exponent"
+        codeNegativeSquareRoot = "negative_square_root"
+        codeResultTooLong      = "result_too_long"
+        codeInternal           = "internal_error"
 )
 
-// maxOperandLength bounds the size of a single operand string.
+// maxOperandLength bounds the size of a single operand string. Results are
+// held to the same bound, so every result can be the operand of the next call.
 const maxOperandLength = 64
 
 // operandPattern accepts plain decimal notation only. Exponent notation such
@@ -215,6 +220,7 @@ func parseOperand(field, value string) (decimal.Decimal, error) <span class="cov
 
 import (
         "errors"
+        "fmt"
         "net/http"
 
         "github.com/gin-gonic/gin"
@@ -253,8 +259,20 @@ func binaryHandler(op binaryOperation) gin.HandlerFunc <span class="cov8" title=
                         writeDomainError(c, err)
                         return
                 }</span>
-                <span class="cov8" title="1">c.JSON(http.StatusOK, resultResponse{Result: result.String()})</span>
+                <span class="cov8" title="1">writeResult(c, result)</span>
         }
+}
+
+// writeResult answers with the result, or with 422 result_too_long when it
+// would not be accepted back as an operand (for example 2^1000, 302 digits).
+func writeResult(c *gin.Context, result decimal.Decimal) <span class="cov8" title="1">{
+        s := result.String()
+        if len(s) &gt; maxOperandLength </span><span class="cov8" title="1">{
+                c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeResultTooLong,
+                        fmt.Sprintf("the result has more than %d characters", maxOperandLength)))
+                return
+        }</span>
+        <span class="cov8" title="1">c.JSON(http.StatusOK, resultResponse{Result: s})</span>
 }
 
 // writeDomainError translates a domain error into an HTTP response.
@@ -264,6 +282,8 @@ func writeDomainError(c *gin.Context, err error) <span class="cov8" title="1">{
                 c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeDivisionByZero, err.Error()))</span>
         case errors.Is(err, calculator.ErrInvalidExponent):<span class="cov8" title="1">
                 c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeInvalidExponent, err.Error()))</span>
+        case errors.Is(err, calculator.ErrNegativeSquareRoot):<span class="cov8" title="1">
+                c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeNegativeSquareRoot, err.Error()))</span>
         default:<span class="cov0" title="0">
                 _ = c.Error(err)
                 c.JSON(http.StatusInternalServerError, newErrorResponse(codeInternal, "internal server error"))</span>
@@ -310,6 +330,7 @@ func NewRouter(allowedOrigins []string) *gin.Engine <span class="cov8" title="1"
         v1.POST("/divide", binaryHandler(calculator.Divide))
         v1.POST("/power", binaryHandler(calculator.Power))
         v1.POST("/percentage", unaryHandler(calculator.Percentage))
+        v1.POST("/sqrt", unaryHandler(calculator.Sqrt))
 
         return r</span>
 }
@@ -324,7 +345,7 @@ import (
         "github.com/shopspring/decimal"
 )
 
-// unaryRequest is the body of every one-operand operation (percentage, ...).
+// unaryRequest is the body of every one-operand operation (percentage, sqrt).
 // The operand is a JSON string to preserve decimal precision.
 type unaryRequest struct {
         Value string `json:"value" binding:"required"`
@@ -350,11 +371,11 @@ func unaryHandler(op unaryOperation) gin.HandlerFunc <span class="cov8" title="1
                 }</span>
 
                 <span class="cov8" title="1">result, err := op(value)
-                if err != nil </span><span class="cov0" title="0">{
+                if err != nil </span><span class="cov8" title="1">{
                         writeDomainError(c, err)
                         return
                 }</span>
-                <span class="cov8" title="1">c.JSON(http.StatusOK, resultResponse{Result: result.String()})</span>
+                <span class="cov8" title="1">writeResult(c, result)</span>
         }
 }
 </pre>
@@ -439,6 +460,35 @@ func Power(a, b decimal.Decimal) (decimal.Decimal, error) <span class="cov8" tit
 </pre>
 		
 		<pre class="file" id="file7" style="display: none">package calculator
+
+import (
+        "math/big"
+
+        "github.com/shopspring/decimal"
+)
+
+// sqrtPrecision is the binary precision used for square roots. 256 bits are
+// about 77 significant decimal digits, more than a 64-character operand needs.
+const sqrtPrecision = 256
+
+// Sqrt returns the square root of value rounded to DivisionScale decimal
+// places, using the standard library's big.Float.Sqrt. It returns
+// ErrNegativeSquareRoot when value is negative.
+func Sqrt(value decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        if value.IsNegative() </span><span class="cov8" title="1">{
+                return decimal.Decimal{}, ErrNegativeSquareRoot
+        }</span>
+
+        // Neither conversion can fail: value.String() and Text('f', ...) always
+        // produce a plain decimal. Four extra digits leave the final rounding to the
+        // decimal library, like every other operation.
+        <span class="cov8" title="1">f, _ := new(big.Float).SetPrec(sqrtPrecision).SetString(value.String())
+        root := decimal.RequireFromString(new(big.Float).SetPrec(sqrtPrecision).Sqrt(f).Text('f', DivisionScale+4))
+        return root.Round(DivisionScale), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package calculator
 
 import "github.com/shopspring/decimal"
 

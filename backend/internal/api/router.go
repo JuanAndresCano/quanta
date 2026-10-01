@@ -33,6 +33,7 @@ func NewRouter(allowedOrigins []string) *gin.Engine {
 	v1.POST("/divide", binaryHandler(calculator.Divide))
 	v1.POST("/power", binaryHandler(calculator.Power))
 	v1.POST("/percentage", unaryHandler(calculator.Percentage))
+	v1.POST("/sqrt", unaryHandler(calculator.Sqrt))
 
 	return r
 }

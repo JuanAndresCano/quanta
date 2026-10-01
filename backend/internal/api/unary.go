@@ -7,7 +7,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// unaryRequest is the body of every one-operand operation (percentage, ...).
+// unaryRequest is the body of every one-operand operation (percentage, sqrt).
 // The operand is a JSON string to preserve decimal precision.
 type unaryRequest struct {
 	Value string `json:"value" binding:"required"`
@@ -37,6 +37,6 @@ func unaryHandler(op unaryOperation) gin.HandlerFunc {
 			writeDomainError(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, resultResponse{Result: result.String()})
+		writeResult(c, result)
 	}
 }

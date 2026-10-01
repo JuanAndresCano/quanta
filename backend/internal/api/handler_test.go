@@ -38,6 +38,8 @@ func TestOperations(t *testing.T) {
 		{name: "divide", path: "/api/v1/divide", body: `{"a":"1","b":"3"}`, wantStatus: 200, wantResult: "0.3333333333333333"},
 
 		{name: "division by zero", path: "/api/v1/divide", body: `{"a":"1","b":"0"}`, wantStatus: 422, wantCode: codeDivisionByZero},
+		{name: "result of exactly 64 characters", path: "/api/v1/multiply", body: `{"a":"` + strings.Repeat("9", 32) + `","b":"` + strings.Repeat("9", 32) + `"}`, wantStatus: 200, wantResult: strings.Repeat("9", 31) + "8" + strings.Repeat("0", 31) + "1"},
+		{name: "result over 64 characters", path: "/api/v1/multiply", body: `{"a":"` + strings.Repeat("9", 33) + `","b":"` + strings.Repeat("9", 32) + `"}`, wantStatus: 422, wantCode: codeResultTooLong},
 
 		{name: "malformed json", path: "/api/v1/add", body: `{"a":`, wantStatus: 400, wantCode: codeInvalidRequest},
 		{name: "missing operand", path: "/api/v1/add", body: `{"a":"1"}`, wantStatus: 400, wantCode: codeInvalidRequest},

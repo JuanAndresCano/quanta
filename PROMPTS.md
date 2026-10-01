@@ -1,6 +1,6 @@
 # Prompts
 
-I built this project with Claude Code (Claude Sonnet 5.5, medium effort) as a pair programmer. This file explains how I used it and quotes the prompts that shaped the result.
+I built this project with Claude Code as a pair programmer: Claude Sonnet 5.5 (medium effort) for the build, and Claude Opus 5.5 for the final review and the changes that came out of it. This file explains how I used it and quotes the prompts that shaped the result.
 
 My prompts are quoted verbatim in Spanish, my working language; `[…]` marks a cut. Everything in the repository itself is in English.
 
@@ -26,7 +26,7 @@ These rules were consolidated into the context prompt I used to open each workin
 | Repository | Monorepo, but frontend and backend each with their own Dockerfile | Each side can be built, run and deployed on its own |
 | HTTP framework | Gin, after asking for pros and cons | Small, idiomatic, CORS middleware available |
 | Arithmetic | Exact decimals (`shopspring/decimal`), numbers as JSON strings | `0.1 + 0.2` must be `0.3` in a calculator |
-| Advanced operations | `percentage` always; `power` and `sqrt` only if the decimal library supports them natively | No hand-written numeric algorithms inside a 2–4 hour timebox |
+| Advanced operations | `percentage` always; `power` and `sqrt` only with library support, never hand-written | No hand-written numeric algorithms inside a 2–4 hour timebox |
 | Edge cases | Accepted that `±` right after an operator only changes the display | It avoided low-value micro-iterations |
 | Order of work | CI before the advanced operations | A safety net before touching working code |
 | Quality | Kept the Docker build in CI and added end-to-end tests through nginx | Once everything was containerized, I wanted it verified end to end |
@@ -82,11 +82,22 @@ These rules were consolidated into the context prompt I used to open each workin
 
 ### Review before submitting
 
-Before merging the last branch, I asked for a critical review of the project against the brief.
+Before merging the last branch, I switched to Claude Opus 5.5 and asked for a critical review of the project against the brief. A different, stronger model gave me a second opinion that had not been part of building the project.
 
 > bro, quiero que leas la consigna completa y me hagas un burn honesto sobre el trabajo que hice en comparación con lo que me pidieron
 
-This led to committing a snapshot of the HTML coverage reports under `coverage/` (the brief lists a coverage report as a deliverable) and to rewriting this file.
+It led to these changes:
+
+- Committing a snapshot of the HTML coverage reports under `coverage/`, because the brief lists a coverage report as a deliverable.
+- Building `sqrt` with the standard library's `math/big.Float.Sqrt`. It respects the "no hand-written algorithms" rule, which had only been checked against the decimal library.
+- Making `%` behave like iOS (`200 + 10 % =` is 220, not 200.1).
+- Rewriting this file.
+
+**A bug I found by hand.** While testing the app, I chained a very large power, and the page froze. I reported it like this:
+
+> Bro, por cierto, intenté hacer un cálculo súper grande y se quedó pegada y se bloqueo, pero no debería avisar que es un error? Tipo, al igual que en la división entre 0.
+
+The assistant reproduced it in the browser before touching any code. The backend answered in milliseconds. The cause was in the frontend: a chained power returned a 64,000-digit result, and formatting and drawing it blocked the page for about 3.4 seconds. The fix applies the operand limit to results as well. A result longer than 64 characters is now `422 result_too_long`, shown as "Result too long", in the same way as a division by zero.
 
 ## Summary by branch
 
@@ -102,3 +113,4 @@ This led to committing a snapshot of the HTML coverage reports under `coverage/`
 | `feat/ci` | GitHub Actions with `backend`, `frontend` and `docker` jobs; `.gitattributes` to fix CRLF on Windows |
 | `feat/advanced-operations` | `percentage` and bounded `power` end to end, and the e2e suite through nginx |
 | `feat/docs-coverage` | Final README, coverage tooling and HTML snapshot, this file |
+| `feat/sqrt-percent` | `sqrt` with `math/big`, iOS-style `%`, the `result_too_long` limit, and their tests in every layer |

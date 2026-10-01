@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -40,8 +41,20 @@ func binaryHandler(op binaryOperation) gin.HandlerFunc {
 			writeDomainError(c, err)
 			return
 		}
-		c.JSON(http.StatusOK, resultResponse{Result: result.String()})
+		writeResult(c, result)
 	}
+}
+
+// writeResult answers with the result, or with 422 result_too_long when it
+// would not be accepted back as an operand (for example 2^1000, 302 digits).
+func writeResult(c *gin.Context, result decimal.Decimal) {
+	s := result.String()
+	if len(s) > maxOperandLength {
+		c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeResultTooLong,
+			fmt.Sprintf("the result has more than %d characters", maxOperandLength)))
+		return
+	}
+	c.JSON(http.StatusOK, resultResponse{Result: s})
 }
 
 // writeDomainError translates a domain error into an HTTP response.
@@ -51,6 +64,8 @@ func writeDomainError(c *gin.Context, err error) {
 		c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeDivisionByZero, err.Error()))
 	case errors.Is(err, calculator.ErrInvalidExponent):
 		c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeInvalidExponent, err.Error()))
+	case errors.Is(err, calculator.ErrNegativeSquareRoot):
+		c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeNegativeSquareRoot, err.Error()))
 	default:
 		_ = c.Error(err)
 		c.JSON(http.StatusInternalServerError, newErrorResponse(codeInternal, "internal server error"))

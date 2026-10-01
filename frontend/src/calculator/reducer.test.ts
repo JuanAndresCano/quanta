@@ -19,7 +19,8 @@ const OPERATORS: Record<string, Operator> = {
 
 /**
  * Tiny DSL to keep the tables readable: digits, `.`, `~` (toggle sign),
- * `+ - * / ^` (operators), `%` (percent), `=` (equals) and `C` (clear).
+ * `+ - * / ^` (operators), `%` (percent), `r` (square root), `=` (equals) and
+ * `C` (clear).
  */
 function keys(input: string): Action[] {
   return [...input].map((ch): Action => {
@@ -27,6 +28,7 @@ function keys(input: string): Action[] {
     if (ch === '~') return { type: 'toggleSign' }
     if (ch === '=') return { type: 'equals' }
     if (ch === '%') return { type: 'percent' }
+    if (ch === 'r') return { type: 'sqrt' }
     if (ch === 'C') return { type: 'clear' }
     if (ch in OPERATORS) return { type: 'operator', operator: OPERATORS[ch] }
     return { type: 'digit', digit: ch as Digit }
@@ -283,15 +285,38 @@ describe('percent', () => {
     expect(press('7', state).display).toBe('7')
   })
 
-  it('keeps the pending operator, so 200 + 10 % = adds a tenth', () => {
-    const afterPercent = answer(press('200+10%'), '0.1')
-    expect(afterPercent).toMatchObject({ accumulator: '200', operator: 'add', display: '0.1' })
-    expect(press('=', afterPercent).pending).toEqual({
-      operator: 'add',
-      a: '200',
-      b: '0.1',
-      next: null,
-    })
+  it.each([
+    { input: '200*10%', operator: 'multiply' },
+    { input: '200/10%', operator: 'divide' },
+    { input: '2^10%', operator: 'power' },
+  ])('"$input" takes the hundredth and keeps the $operator', ({ input, operator }) => {
+    expect(press(input).pending).toEqual({ operator: 'percentage', value: '10', next: null })
+    expect(answer(press(input), '0.1')).toMatchObject({ accumulator: input.split(/\D/)[0], operator, display: '0.1' })
+  })
+
+  it.each([
+    { input: '200+10%', operator: 'add' },
+    { input: '200-10%', operator: 'subtract' },
+  ])('"$input" is a percentage of the first operand, like iOS', ({ input, operator }) => {
+    const first = press(input)
+    expect(first.pending).toEqual({ operator: 'percentage', value: '10', next: null, of: '200' })
+
+    // Second step: 200 × 0.1, which replaces the display and keeps the operation.
+    const second = answer(first, '0.1')
+    expect(second.pending).toEqual({ operator: 'multiply', a: '200', b: '0.1', next: null, operand: true })
+
+    const shown = answer(second, '20')
+    expect(shown).toMatchObject({ accumulator: '200', operator, display: '20', pending: null })
+    expect(press('=', shown).pending).toEqual({ operator, a: '200', b: '20', next: null })
+  })
+
+  it('right after + uses the first operand as the percentage too (200 + % is 400)', () => {
+    expect(press('200+%').pending).toEqual({ operator: 'percentage', value: '200', next: null, of: '200' })
+  })
+
+  it('rejects a relative percentage longer than the backend accepts', () => {
+    const state = answer(press('5+3%'), '1'.repeat(MAX_OPERAND_LENGTH + 1))
+    expect(state).toMatchObject({ error: 'operand_too_long', pending: null })
   })
 
   it('does nothing special after an error except what typing does', () => {
@@ -308,6 +333,29 @@ describe('percent', () => {
   it('rejects a value longer than the backend accepts', () => {
     const state = answer(press('7+3='), '1'.repeat(MAX_OPERAND_LENGTH + 1))
     expect(press('%', state)).toMatchObject({ error: 'operand_too_long', pending: null })
+  })
+})
+
+describe('square root', () => {
+  it.each([
+    { input: '16r', value: '16' },
+    { input: '2.r', value: '2' },
+    { input: '.25r', value: '0.25' },
+    { input: 'r', value: '0' },
+    { input: '4~r', value: '-4' },
+  ])('"$input" requests the square root of "$value"', ({ input, value }) => {
+    expect(press(input).pending).toEqual({ operator: 'sqrt', value, next: null })
+  })
+
+  it('replaces the display and keeps the operation in progress', () => {
+    const state = answer(press('9+16r'), '4')
+    expect(state).toMatchObject({ accumulator: '9', operator: 'add', display: '4', pending: null })
+    expect(press('=', state).pending).toEqual({ operator: 'add', a: '9', b: '4', next: null })
+  })
+
+  it('shows the backend error for a negative number', () => {
+    const state = reducer(press('4~r'), { type: 'fail', code: 'negative_square_root' })
+    expect(state).toMatchObject({ error: 'negative_square_root', pending: null })
   })
 })
 

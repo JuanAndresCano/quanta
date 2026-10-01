@@ -58,6 +58,16 @@ describe('request', () => {
     expect(init.body).toBe('{"value":"50"}')
   })
 
+  it('posts sqrt as a one-operand body to its own route', async () => {
+    const fetchMock = mockFetch(json({ result: '4' }))
+
+    await expect(apiCalculate({ operator: 'sqrt', value: '16' }, signal)).resolves.toBe('4')
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/sqrt')
+    expect(init.body).toBe('{"value":"16"}')
+  })
+
   it('sends long and negative operands untouched', async () => {
     const a = '-12345678901234567890.123456789'
     const fetchMock = mockFetch(json({ result: '0' }))
@@ -100,6 +110,8 @@ describe('errors', () => {
     ['invalid_operand', 400],
     ['division_by_zero', 422],
     ['invalid_exponent', 422],
+    ['negative_square_root', 422],
+    ['result_too_long', 422],
     ['internal_error', 500],
   ])('maps the backend code %s (status %i)', async (code, status) => {
     mockFetch(json(errorBody(code), status))

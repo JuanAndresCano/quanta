@@ -5,6 +5,7 @@ import {
   type Action,
   type CalculatorState,
   type Operator,
+  type UnaryOperator,
 } from './types'
 
 export const initialState: CalculatorState = {
@@ -54,6 +55,8 @@ export function reducer(state: CalculatorState, action: Action): CalculatorState
       return equals(current)
     case 'percent':
       return percent(current)
+    case 'sqrt':
+      return unary(current, 'sqrt')
   }
 }
 
@@ -94,13 +97,25 @@ function equals(state: CalculatorState): CalculatorState {
 }
 
 /**
- * Replaces the number on the display with its hundredth. A pending operator
- * and accumulator are kept, so `200 + 10 % =` computes `200 + 0.1`.
+ * Replaces the number on the display with a percentage, like iOS: after `+`
+ * or `−` it is a percentage of the first operand (`200 + 10 %` shows 20, so
+ * `=` gives 220); otherwise it is the number's hundredth (`200 × 10 %` is
+ * `200 × 0.1`). The pending operator is kept either way.
  */
 function percent(state: CalculatorState): CalculatorState {
+  const relative = state.operator === 'add' || state.operator === 'subtract'
+  return unary(state, 'percentage', relative ? state.accumulator : null)
+}
+
+/** Applies a one-operand operation to the number on the display. */
+function unary(
+  state: CalculatorState,
+  operator: UnaryOperator,
+  of: string | null = null,
+): CalculatorState {
   const value = normalizeOperand(state.display)
   if (value.length > MAX_OPERAND_LENGTH) return tooLong()
-  return { ...state, pending: { operator: 'percentage', value, next: null } }
+  return { ...state, pending: { operator, value, next: null, ...(of !== null && { of }) } }
 }
 
 function request(
@@ -117,7 +132,16 @@ function request(
 function resolve(state: CalculatorState, result: string): CalculatorState {
   const { pending } = state
   if (!pending) return state // stale answer, e.g. the user pressed AC meanwhile
-  if (pending.operator === 'percentage') {
+  if ('of' in pending && pending.of) {
+    // Second step of a relative percentage: of × (value / 100).
+    if (result.length > MAX_OPERAND_LENGTH) return tooLong()
+    return {
+      ...state,
+      pending: { operator: 'multiply', a: pending.of, b: result, next: null, operand: true },
+    }
+  }
+  if ('value' in pending || pending.operand) {
+    // The result replaces the display; the operation in progress is kept.
     return { ...state, display: result, overwrite: true, pending: null, error: null }
   }
   return {

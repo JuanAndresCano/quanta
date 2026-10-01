@@ -17,6 +17,8 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   invalid_operand: 'Invalid number',
   invalid_request: 'Invalid request',
   invalid_exponent: 'Invalid exponent',
+  negative_square_root: 'Negative square root',
+  result_too_long: 'Result too long',
   internal_error: 'Server error',
   network_error: 'Cannot reach the server',
   operand_too_long: 'Number too long',
