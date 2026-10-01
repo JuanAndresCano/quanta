@@ -137,6 +137,16 @@ Open http://localhost:3000. Compose starts the backend first and waits for its h
 
 _TBD_ — how to run the tests and produce coverage reports for both layers.
 
+## Continuous integration
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every pull request to `main`, with three jobs in parallel:
+
+- **`backend`:** `gofmt` check, `go vet ./...` and `go test ./...` (Go version read from `backend/go.mod`).
+- **`frontend`:** `npm ci`, `npm run lint`, `npm test` and `npm run build` (Node 22).
+- **`docker`:** builds both images, starts the stack with `docker compose up --wait` (so both healthchecks must pass) and sends a real request through nginx.
+
+To make them mandatory, require the `backend`, `frontend` and `docker` status checks in the branch protection rule of `main`. The same commands can be run locally from `backend/` and `frontend/`.
+
 ## Design decisions
 
 Decisions taken so far (more will be added as the remaining branches land).

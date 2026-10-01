@@ -1,0 +1,2 @@
+# Keep LF line endings on every platform: CRLF breaks gofmt and makes noisy diffs.
+* text=auto eol=lf
