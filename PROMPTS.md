@@ -9,3 +9,7 @@ AI tooling (Claude Code) was used while building this project. This file records
 - Decided API shape: one `POST` endpoint per operation instead of a single `/calculate` endpoint.
 - Decided workflow: one `feat/*` branch per mission, merged to `main` through a pull request once the mission's "done" criteria are met.
 - Scaffolded the monorepo: `backend/` (Go module) and `frontend/` (Vite React-TS).
+
+## `feat/backend-calculator-core`
+
+- Implemented the pure calculator domain (add, subtract, multiply, divide) on top of `shopspring/decimal`, with table-driven tests covering exact decimals, negatives, large values and division by zero.
