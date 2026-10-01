@@ -29,7 +29,7 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
   - [x] Vite dev proxy `/api` to `localhost:8080`
   - [x] Verified in the browser against the real backend (success, `1/0`, long decimals, backend down)
 - [x] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
-- [ ] `feat/advanced-operations`: see "Advanced operations" below
+- [x] `feat/advanced-operations`: see "Advanced operations" below
 - [x] `feat/ci`: GitHub Actions workflow
 - [ ] `feat/docs-coverage`: final README, coverage summary, prompts
 
@@ -60,10 +60,10 @@ Findings (`shopspring/decimal` v1.4.0): `PowInt32` exists, so `power` qualifies.
 
 Tasks:
 
-- [ ] Unary handler (`{"value": "..."}`) in the API layer (needed by `percentage`).
-- [ ] `percentage` in the domain, API, tests and README; reducer action and enable the `%` key in the frontend (it is rendered disabled today).
-- [ ] `power`: bounded exponent, error code and README entry; frontend key and reducer support (binary operator).
-- [ ] Update the API table, error table and design decisions in the README.
+- [x] Unary handler (`{"value": "..."}`) in the API layer (needed by `percentage`).
+- [x] `percentage` in the domain, API, tests and README; reducer action and `%` key enabled in the frontend. `%` acts on the display and keeps the pending operator (`200 + 10 % =` is `200.1`).
+- [x] `power`: bounded exponent (`invalid_exponent`), README entry; `xʸ` key in a new full-width row, reusing the binary operator path.
+- [x] Update the API table, error table and design decisions in the README.
 
 ### Parked: square root
 

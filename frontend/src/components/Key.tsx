@@ -8,14 +8,17 @@ interface KeyProps {
   ariaLabel?: string
   /** The `0` key spans two columns. */
   wide?: boolean
+  /** Spans the whole row (the `xʸ` key). */
+  full?: boolean
   /** Highlights the operator that is waiting for its second operand. */
   active?: boolean
   disabled?: boolean
 }
 
-export function Key({ label, variant, onPress, ariaLabel, wide, active, disabled }: KeyProps) {
+export function Key({ label, variant, onPress, ariaLabel, wide, full, active, disabled }: KeyProps) {
   const classes = ['key', `key--${variant}`]
   if (wide) classes.push('key--wide')
+  if (full) classes.push('key--full')
   if (active) classes.push('key--active')
 
   return (

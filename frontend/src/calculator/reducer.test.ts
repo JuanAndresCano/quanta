@@ -14,17 +14,19 @@ const OPERATORS: Record<string, Operator> = {
   '-': 'subtract',
   '*': 'multiply',
   '/': 'divide',
+  '^': 'power',
 }
 
 /**
  * Tiny DSL to keep the tables readable: digits, `.`, `~` (toggle sign),
- * `+ - * /` (operators), `=` (equals) and `C` (clear).
+ * `+ - * / ^` (operators), `%` (percent), `=` (equals) and `C` (clear).
  */
 function keys(input: string): Action[] {
   return [...input].map((ch): Action => {
     if (ch === '.') return { type: 'decimal' }
     if (ch === '~') return { type: 'toggleSign' }
     if (ch === '=') return { type: 'equals' }
+    if (ch === '%') return { type: 'percent' }
     if (ch === 'C') return { type: 'clear' }
     if (ch in OPERATORS) return { type: 'operator', operator: OPERATORS[ch] }
     return { type: 'digit', digit: ch as Digit }
@@ -255,5 +257,78 @@ describe('string contract', () => {
       b: '3',
       next: null,
     })
+  })
+})
+
+describe('percent', () => {
+  it.each([
+    { input: '50%', value: '50' },
+    { input: '5.%', value: '5' },
+    { input: '.5%', value: '0.5' },
+    { input: '5~%', value: '-5' },
+    { input: '0%', value: '0' },
+    { input: '%', value: '0' },
+  ])('"$input" requests the percentage of "$value"', ({ input, value }) => {
+    expect(press(input).pending).toEqual({ operator: 'percentage', value, next: null })
+  })
+
+  it('locks the keypad while the request is in flight', () => {
+    const state = press('50%')
+    expect(press('7+%=', state)).toBe(state)
+  })
+
+  it('replaces the display with the result and starts a new number on the next digit', () => {
+    const state = answer(press('50%'), '0.5')
+    expect(state).toMatchObject({ display: '0.5', overwrite: true, pending: null, error: null })
+    expect(press('7', state).display).toBe('7')
+  })
+
+  it('keeps the pending operator, so 200 + 10 % = adds a tenth', () => {
+    const afterPercent = answer(press('200+10%'), '0.1')
+    expect(afterPercent).toMatchObject({ accumulator: '200', operator: 'add', display: '0.1' })
+    expect(press('=', afterPercent).pending).toEqual({
+      operator: 'add',
+      a: '200',
+      b: '0.1',
+      next: null,
+    })
+  })
+
+  it('does nothing special after an error except what typing does', () => {
+    const failed = reducer(press('5%'), { type: 'fail', code: 'internal_error' })
+    expect(reducer(failed, { type: 'percent' })).toBe(failed)
+    expect(press('3%', failed).pending).toEqual({ operator: 'percentage', value: '3', next: null })
+  })
+
+  it('ignores a late answer after AC', () => {
+    const cleared = press('50%C')
+    expect(answer(cleared, '0.5')).toBe(cleared)
+  })
+
+  it('rejects a value longer than the backend accepts', () => {
+    const state = answer(press('7+3='), '1'.repeat(MAX_OPERAND_LENGTH + 1))
+    expect(press('%', state)).toMatchObject({ error: 'operand_too_long', pending: null })
+  })
+})
+
+describe('power', () => {
+  it.each([
+    { input: '2^10=', want: { operator: 'power', a: '2', b: '10', next: null } },
+    { input: '2^3~=', want: { operator: 'power', a: '2', b: '-3', next: null } },
+    { input: '1.5^2.=', want: { operator: 'power', a: '1.5', b: '2', next: null } },
+    { input: '5~^2=', want: { operator: 'power', a: '-5', b: '2', next: null } },
+    { input: '2^=', want: { operator: 'power', a: '2', b: '2', next: null } },
+  ])('"$input" requests the power', ({ input, want }) => {
+    expect(press(input).pending).toEqual(want)
+  })
+
+  it('chains from left to right like the other operators', () => {
+    const state = press('2^3+')
+    expect(state.pending).toEqual({ operator: 'power', a: '2', b: '3', next: 'add' })
+    expect(answer(state, '8')).toMatchObject({ accumulator: '8', operator: 'add', display: '8' })
+  })
+
+  it('replaces a power operator pressed twice', () => {
+    expect(press('2^*')).toMatchObject({ operator: 'multiply', pending: null })
   })
 })

@@ -7,6 +7,7 @@ interface KeypadProps {
 }
 
 const OPERATOR_KEYS: Record<Operator, { label: string; name: string }> = {
+  power: { label: 'xʸ', name: 'power' },
   divide: { label: '÷', name: 'divide' },
   multiply: { label: '×', name: 'multiply' },
   subtract: { label: '−', name: 'subtract' },
@@ -28,8 +29,9 @@ export function Keypad({ state, dispatch }: KeypadProps) {
     />
   )
 
-  const operator = (value: Operator) => (
+  const operator = (value: Operator, full = false) => (
     <Key
+      full={full}
       label={OPERATOR_KEYS[value].label}
       ariaLabel={OPERATOR_KEYS[value].name}
       variant="operator"
@@ -41,6 +43,8 @@ export function Keypad({ state, dispatch }: KeypadProps) {
 
   return (
     <div className="keypad">
+      {operator('power', true)}
+
       <Key label="AC" ariaLabel="clear" variant="function" onPress={() => dispatch({ type: 'clear' })} />
       <Key
         label="±"
@@ -49,8 +53,13 @@ export function Keypad({ state, dispatch }: KeypadProps) {
         disabled={busy}
         onPress={() => dispatch({ type: 'toggleSign' })}
       />
-      {/* Enabled by feat/advanced-operations. */}
-      <Key label="%" ariaLabel="percent" variant="function" disabled onPress={() => {}} />
+      <Key
+        label="%"
+        ariaLabel="percent"
+        variant="function"
+        disabled={busy}
+        onPress={() => dispatch({ type: 'percent' })}
+      />
       {operator('divide')}
 
       {digit('7')}

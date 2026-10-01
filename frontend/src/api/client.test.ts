@@ -42,10 +42,20 @@ describe('request', () => {
     expect(init.signal).toBe(signal)
   })
 
-  it.each(['add', 'subtract', 'multiply', 'divide'] as const)('uses the %s route', async (operator) => {
+  it.each(['add', 'subtract', 'multiply', 'divide', 'power'] as const)('uses the %s route', async (operator) => {
     const fetchMock = mockFetch(json({ result: '1' }))
     await apiCalculate({ operator, a: '1', b: '1' }, signal)
     expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/v1/${operator}`)
+  })
+
+  it('posts percentage as a one-operand body to its own route', async () => {
+    const fetchMock = mockFetch(json({ result: '0.5' }))
+
+    await expect(apiCalculate({ operator: 'percentage', value: '50' }, signal)).resolves.toBe('0.5')
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/percentage')
+    expect(init.body).toBe('{"value":"50"}')
   })
 
   it('sends long and negative operands untouched', async () => {
@@ -89,6 +99,7 @@ describe('errors', () => {
     ['invalid_request', 400],
     ['invalid_operand', 400],
     ['division_by_zero', 422],
+    ['invalid_exponent', 422],
     ['internal_error', 500],
   ])('maps the backend code %s (status %i)', async (code, status) => {
     mockFetch(json(errorBody(code), status))

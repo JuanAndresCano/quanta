@@ -9,10 +9,11 @@ import (
 
 // Error codes returned in the API error body.
 const (
-	codeInvalidRequest = "invalid_request"
-	codeInvalidOperand = "invalid_operand"
-	codeDivisionByZero = "division_by_zero"
-	codeInternal       = "internal_error"
+	codeInvalidRequest  = "invalid_request"
+	codeInvalidOperand  = "invalid_operand"
+	codeDivisionByZero  = "division_by_zero"
+	codeInvalidExponent = "invalid_exponent"
+	codeInternal        = "internal_error"
 )
 
 // maxOperandLength bounds the size of a single operand string.

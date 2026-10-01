@@ -54,3 +54,11 @@ AI tooling (Claude Code) was used while building this project. This file records
 - Chose CI before the advanced operations to have a safety net while touching working code, and kept it minimal: one workflow on pull requests to `main`, with parallel `backend` (gofmt, vet, test) and `frontend` (lint, test, build) jobs.
 - Ran every step locally first. `gofmt -l` flagged all Go files only because the Windows checkout had CRLF line endings (clean once normalized to LF), so a `.gitattributes` with `eol=lf` was added.
 - Added a third `docker` job (compose build, `--wait` for both healthchecks, and a real request through nginx) so the Docker setup is verified end to end on every pull request.
+
+## `feat/advanced-operations`
+
+- Planned the branch in two independently shippable stretches: `percentage` (mandatory) first, then `power`. `sqrt` stays out of scope.
+- Checked the decimal library before designing `power`: `PowInt32` returns an error only for `0^0`, but `0` to a negative power would divide by zero inside the library, so it is guarded before the call. Negative exponents are rounded to 16 decimals, like a division.
+- Decided the contract: `percentage` is `value / 100` through `Shift(-2)` (exact), `power` takes an integer exponent with `|b| <= 1000`, and the new error code is `invalid_exponent` (`422`).
+- Frontend: a one-operand pending request next to the binary one, `%` acting on the display and keeping the pending operator, and a new full-width `xʸ` row because the iOS keypad has no room for it.
+- Designed end-to-end tests that run against the Docker stack through nginx with Node's built-in test runner (no new dependencies), covering every operation, the error contract and nginx behavior, and wired them into the CI `docker` job together with a backend-down check.

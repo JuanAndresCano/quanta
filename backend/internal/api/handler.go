@@ -49,6 +49,8 @@ func writeDomainError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, calculator.ErrDivisionByZero):
 		c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeDivisionByZero, err.Error()))
+	case errors.Is(err, calculator.ErrInvalidExponent):
+		c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeInvalidExponent, err.Error()))
 	default:
 		_ = c.Error(err)
 		c.JSON(http.StatusInternalServerError, newErrorResponse(codeInternal, "internal server error"))
