@@ -60,8 +60,8 @@ Findings (`shopspring/decimal` v1.4.0): `PowInt32` exists, so `power` qualifies.
 
 Tasks:
 
-- [ ] Unary handler (`{"value": "..."}`) in the API layer (needed by `percentage`).
-- [ ] `percentage` in the domain, API, tests and README; reducer action and enable the `%` key in the frontend (it is rendered disabled today).
+- [x] Unary handler (`{"value": "..."}`) in the API layer (needed by `percentage`).
+- [x] `percentage` in the domain, API, tests and README; reducer action and `%` key enabled in the frontend. `%` acts on the display and keeps the pending operator (`200 + 10 % =` is `200.1`).
 - [ ] `power`: bounded exponent, error code and README entry; frontend key and reducer support (binary operator).
 - [ ] Update the API table, error table and design decisions in the README.
 

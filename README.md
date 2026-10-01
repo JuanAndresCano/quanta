@@ -55,6 +55,7 @@ Base path: `/api/v1`. Every operation is a `POST` with a JSON body. Operands are
 | `POST /api/v1/subtract` | `{"a": "5", "b": "3"}` | `a - b` |
 | `POST /api/v1/multiply` | `{"a": "4", "b": "3"}` | `a * b` |
 | `POST /api/v1/divide` | `{"a": "1", "b": "3"}` | `a / b`, rounded to 16 decimal places |
+| `POST /api/v1/percentage` | `{"value": "12.5"}` | `value / 100`, exact (`0.125`) |
 | `GET /healthz` | - | `{"status": "ok"}` |
 
 Success (`200`):
@@ -169,9 +170,9 @@ Decisions taken so far (more will be added as the remaining branches land).
 
 ### API design
 
-- **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (and later `/power`, `/sqrt`, `/percentage`). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
+- **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (plus `/percentage`; `/power` is next). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
 - **`POST` with a JSON body, not `GET`.** Operands are decimal strings, which are cleaner in a body than in a query string.
-- **Thin, explicit routing.** The domain exposes pure functions with the same shape per arity. The router maps each route to a generic handler, so adding an operation is one domain function plus one route line. Only the binary handler exists today; the unary one arrives with the first unary operation (`sqrt`).
+- **Thin, explicit routing.** The domain exposes pure functions with the same shape per arity. The router maps each route to a generic handler, so adding an operation is one domain function plus one route line. Binary operations take `{a, b}` and unary ones take `{value}`, each with its own generic handler.
 - **Two classes of failure, two status codes.** `400` means the request itself is malformed (bad JSON, missing or invalid operand); `422` means it is well formed but mathematically impossible (division by zero). Every error has the same `{"error": {"code", "message"}}` body, and clients should branch on `code`, not on `message`.
 
 ## Workflow

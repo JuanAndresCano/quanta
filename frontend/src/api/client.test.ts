@@ -48,6 +48,16 @@ describe('request', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/v1/${operator}`)
   })
 
+  it('posts percentage as a one-operand body to its own route', async () => {
+    const fetchMock = mockFetch(json({ result: '0.5' }))
+
+    await expect(apiCalculate({ operator: 'percentage', value: '50' }, signal)).resolves.toBe('0.5')
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/percentage')
+    expect(init.body).toBe('{"value":"50"}')
+  })
+
   it('sends long and negative operands untouched', async () => {
     const a = '-12345678901234567890.123456789'
     const fetchMock = mockFetch(json({ result: '0' }))

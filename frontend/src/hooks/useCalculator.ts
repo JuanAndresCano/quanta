@@ -1,7 +1,12 @@
 import { useEffect, useReducer, type ActionDispatch } from 'react'
 import { CalculationError } from '../calculator/errors'
 import { initialState, reducer } from '../calculator/reducer'
-import type { Action, CalculateFn, CalculatorState } from '../calculator/types'
+import type {
+  Action,
+  CalculateFn,
+  CalculationRequest,
+  CalculatorState,
+} from '../calculator/types'
 
 /**
  * Connects the pure reducer to an asynchronous `calculate` function: when the
@@ -18,11 +23,14 @@ export function useCalculator(
     if (!pending) return
 
     const controller = new AbortController()
-    const { operator, a, b } = pending
+    const request: CalculationRequest =
+      pending.operator === 'percentage'
+        ? { operator: 'percentage', value: pending.value }
+        : { operator: pending.operator, a: pending.a, b: pending.b }
 
     // Pressing AC aborts the request; its outcome no longer matters, even if
     // `calculate` ignores the signal and settles anyway.
-    calculate({ operator, a, b }, controller.signal)
+    calculate(request, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return
         dispatch({ type: 'resolve', result })

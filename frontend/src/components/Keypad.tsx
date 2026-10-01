@@ -49,8 +49,13 @@ export function Keypad({ state, dispatch }: KeypadProps) {
         disabled={busy}
         onPress={() => dispatch({ type: 'toggleSign' })}
       />
-      {/* Enabled by feat/advanced-operations. */}
-      <Key label="%" ariaLabel="percent" variant="function" disabled onPress={() => {}} />
+      <Key
+        label="%"
+        ariaLabel="percent"
+        variant="function"
+        disabled={busy}
+        onPress={() => dispatch({ type: 'percent' })}
+      />
       {operator('divide')}
 
       {digit('7')}

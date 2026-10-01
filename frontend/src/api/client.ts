@@ -18,11 +18,13 @@ const BACKEND_ERROR_CODES: readonly ErrorCode[] = [
  * backend's own envelope (server down, proxy error, HTML) is a `network_error`.
  * If `fetch` itself throws, the hook treats it as a `network_error` too.
  */
-export const apiCalculate: CalculateFn = async ({ operator, a, b }, signal) => {
-  const response = await fetch(`/api/v1/${operator}`, {
+export const apiCalculate: CalculateFn = async (request, signal) => {
+  const payload =
+    request.operator === 'percentage' ? { value: request.value } : { a: request.a, b: request.b }
+  const response = await fetch(`/api/v1/${request.operator}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ a, b }),
+    body: JSON.stringify(payload),
     signal,
   })
   const body = await readJson(response)

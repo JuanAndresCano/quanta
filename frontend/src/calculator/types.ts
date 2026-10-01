@@ -21,24 +21,35 @@ export type ErrorCode =
   | 'network_error'
   | 'operand_too_long'
 
-/** A request the UI layer must send to the backend. */
-export interface PendingRequest {
+/** A two-operand request: `POST /api/v1/<operator>` with `{a, b}`. */
+export interface BinaryRequest {
   operator: Operator
   a: string
   b: string
-  /** Operator to continue with once the result arrives (chained operations). */
-  next: Operator | null
 }
+
+/** The one-operand request: `POST /api/v1/percentage` with `{value}`. */
+export interface PercentageRequest {
+  operator: 'percentage'
+  value: string
+}
+
+export type CalculationRequest = BinaryRequest | PercentageRequest
+
+/** A request the UI layer must send to the backend. */
+export type PendingRequest =
+  | (BinaryRequest & {
+      /** Operator to continue with once the result arrives (chained operations). */
+      next: Operator | null
+    })
+  | (PercentageRequest & { next: null })
 
 /**
  * Computes one operation. Operands and the result are decimal strings. It
  * rejects with a `CalculationError` for known failures; any other rejection
  * is treated as a network error.
  */
-export type CalculateFn = (
-  request: Pick<PendingRequest, 'operator' | 'a' | 'b'>,
-  signal: AbortSignal,
-) => Promise<string>
+export type CalculateFn = (request: CalculationRequest, signal: AbortSignal) => Promise<string>
 
 /**
  * Every numeric value is a string, from the keypad to the display to the
@@ -60,6 +71,7 @@ export type Action =
   | { type: 'toggleSign' }
   | { type: 'operator'; operator: Operator }
   | { type: 'equals' }
+  | { type: 'percent' }
   | { type: 'clear' }
   | { type: 'resolve'; result: string }
   | { type: 'fail'; code: ErrorCode }

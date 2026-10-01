@@ -29,6 +29,7 @@ const KEY_NAMES: Record<string, string> = {
   '=': 'equals',
   '.': 'decimal point',
   '~': 'toggle sign',
+  '%': 'percent',
   C: 'clear',
 }
 
@@ -72,9 +73,9 @@ describe('typing', () => {
     expect(add).toHaveAttribute('aria-pressed', 'false')
   })
 
-  it('keeps the percent key disabled until it is implemented', () => {
+  it('enables the percent key', () => {
     setup(vi.fn())
-    expect(screen.getByRole('button', { name: 'percent' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'percent' })).toBeEnabled()
   })
 })
 
@@ -100,6 +101,19 @@ describe('calculating', () => {
 
     expect(calculate.mock.calls[0]?.[0]).toEqual({ operator: 'add', a: '0.1', b: '0.2' })
     await waitFor(() => expect(display()).toHaveTextContent('0.3'))
+  })
+
+  it('sends percent as a one-operand request and shows the result', async () => {
+    const calculate = vi.fn<CalculateFn>().mockResolvedValue('0.5')
+    const { press, display } = setup(calculate)
+
+    await press('5', '0', '%')
+
+    expect(calculate).toHaveBeenCalledWith(
+      { operator: 'percentage', value: '50' },
+      expect.any(AbortSignal),
+    )
+    await waitFor(() => expect(display()).toHaveTextContent('0.5'))
   })
 
   it('normalizes a trailing dot before sending', async () => {
@@ -213,6 +227,18 @@ describe('through the API client', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/v1/add')
     expect(init.body).toBe('{"a":"0.1","b":"0.2"}')
+  })
+
+  it('sends percent as {"value": ...} and shows the exact result', async () => {
+    const fetchMock = stubBackend(200, { result: '0.125' })
+    const { press, display } = setup(apiCalculate)
+
+    await press('1', '2', '.', '5', '%')
+
+    await waitFor(() => expect(display()).toHaveTextContent('0.125'))
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/percentage')
+    expect(init.body).toBe('{"value":"12.5"}')
   })
 
   it('shows a 16-decimal division result untouched', async () => {

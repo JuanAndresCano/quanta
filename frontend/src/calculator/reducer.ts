@@ -52,6 +52,8 @@ export function reducer(state: CalculatorState, action: Action): CalculatorState
       return chooseOperator(current, action.operator)
     case 'equals':
       return equals(current)
+    case 'percent':
+      return percent(current)
   }
 }
 
@@ -91,6 +93,16 @@ function equals(state: CalculatorState): CalculatorState {
   return request(state, state.accumulator, state.operator, null)
 }
 
+/**
+ * Replaces the number on the display with its hundredth. A pending operator
+ * and accumulator are kept, so `200 + 10 % =` computes `200 + 0.1`.
+ */
+function percent(state: CalculatorState): CalculatorState {
+  const value = normalizeOperand(state.display)
+  if (value.length > MAX_OPERAND_LENGTH) return tooLong()
+  return { ...state, pending: { operator: 'percentage', value, next: null } }
+}
+
 function request(
   state: CalculatorState,
   a: string,
@@ -105,6 +117,9 @@ function request(
 function resolve(state: CalculatorState, result: string): CalculatorState {
   const { pending } = state
   if (!pending) return state // stale answer, e.g. the user pressed AC meanwhile
+  if (pending.operator === 'percentage') {
+    return { ...state, display: result, overwrite: true, pending: null, error: null }
+  }
   return {
     display: result,
     accumulator: pending.next ? result : null,
