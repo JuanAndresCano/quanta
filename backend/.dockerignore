@@ -1,0 +1,9 @@
+Dockerfile
+.dockerignore
+bin/
+server
+coverage.out
+coverage.html
+*.test
+*.out
+**/*_test.go

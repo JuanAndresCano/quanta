@@ -98,6 +98,20 @@ Backend configuration (environment variables):
 
 Run the backend with `cd backend && go run ./cmd/server`.
 
+### Backend with Docker
+
+The backend builds and runs on its own; its build context is `backend/`.
+
+```bash
+docker build -t calculator-backend ./backend
+docker run --rm -p 8080:8080 calculator-backend
+curl localhost:8080/healthz
+```
+
+Configuration is passed as environment variables, for example `docker run -e PORT=9000 -e CORS_ALLOWED_ORIGINS=http://localhost:5173 -p 9000:9000 calculator-backend`.
+
+The image is a multi-stage build: a `golang:1.23-alpine` stage compiles a static binary, and the final `alpine` image only contains that binary. It runs as a non-root user, declares a `HEALTHCHECK` on `/healthz`, and uses the exec form of `ENTRYPOINT` so `docker stop` delivers `SIGTERM` and triggers the server's graceful shutdown.
+
 ## Testing and coverage
 
 _TBD_ — how to run the tests and produce coverage reports for both layers.

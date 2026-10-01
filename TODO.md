@@ -7,7 +7,7 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
 - [x] `feat/repo-scaffold`
 - [x] `feat/backend-calculator-core`
 - [x] `feat/backend-api`
-- [ ] `feat/backend-docker`: multi-stage Dockerfile for the backend, image answers on `/healthz`
+- [x] `feat/backend-docker`
 - [ ] `feat/frontend-ui`: iOS-style keypad, display and state, with mocked results
 - [ ] `feat/frontend-api-integration`: API client, loading and error handling against the real backend
 - [ ] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
@@ -38,7 +38,7 @@ The API takes and returns numbers as strings (see "Numeric precision" in the REA
 
 ## Docker and environment
 
-- [ ] Backend image: pin a Go base image compatible with `go 1.23` or newer; run as non-root; small final image.
+- [x] Backend image: multi-stage, non-root, 16 MB, healthcheck, graceful stop.
 - [ ] Frontend image: nginx serves the build and proxies `/api` to the backend service; backend URL configurable.
 - [ ] `docker compose up` runs both; each image also builds and runs on its own.
 - [ ] Vite dev server proxies `/api` to `localhost:8080`.
