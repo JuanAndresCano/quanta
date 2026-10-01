@@ -12,6 +12,7 @@ Thumbs.db
 
 # Backend (Go)
 backend/bin/
+backend/server
 backend/coverage.out
 backend/coverage.html
 *.test
