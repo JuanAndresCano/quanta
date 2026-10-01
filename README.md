@@ -9,7 +9,8 @@ A full-stack calculator: a React + TypeScript frontend that consumes a Go REST A
 | Operation | Priority |
 |---|---|
 | Addition, subtraction, multiplication, division | Required |
-| Exponentiation, square root, percentage | Optional (designed for, built if time allows) |
+| Exponentiation, percentage | Optional, built |
+| Square root | Optional, not built (the decimal library has no native square root) |
 
 ## Repository layout
 
@@ -56,6 +57,7 @@ Base path: `/api/v1`. Every operation is a `POST` with a JSON body. Operands are
 | `POST /api/v1/multiply` | `{"a": "4", "b": "3"}` | `a * b` |
 | `POST /api/v1/divide` | `{"a": "1", "b": "3"}` | `a / b`, rounded to 16 decimal places |
 | `POST /api/v1/percentage` | `{"value": "12.5"}` | `value / 100`, exact (`0.125`) |
+| `POST /api/v1/power` | `{"a": "2", "b": "10"}` | `a ^ b`, integer exponent with `\|b\| <= 1000`; a negative exponent is rounded to 16 decimal places |
 | `GET /healthz` | - | `{"status": "ok"}` |
 
 Success (`200`):
@@ -74,7 +76,8 @@ Errors always have the same shape:
 |---|---|---|
 | `400` | `invalid_request` | Body is not valid JSON, an operand is missing, or an operand is not a JSON string |
 | `400` | `invalid_operand` | An operand is not a plain decimal number (or is too long) |
-| `422` | `division_by_zero` | The request is well formed but mathematically impossible |
+| `422` | `division_by_zero` | The request is well formed but mathematically impossible (`1 / 0`, or `0` to a negative power) |
+| `422` | `invalid_exponent` | `power` with a fractional exponent, `\|b\| > 1000`, or `0 ^ 0` |
 | `404` | - | Unknown operation |
 | `500` | `internal_error` | Unexpected failure |
 
@@ -134,6 +137,18 @@ docker compose up --build
 
 Open http://localhost:3000. Compose starts the backend first and waits for its healthcheck before starting the frontend. Only the frontend is published (port 3000); the backend is reachable from it through the compose network. Stop everything with `docker compose down`.
 
+## End-to-end tests
+
+`e2e/` holds tests that run against the real Docker stack, through nginx, using Node's built-in test runner (no extra dependencies). They cover every operation and its edge cases, the error contract (malformed bodies, bad operand formats, exponent limits), and nginx behavior (HTML not cached, hashed assets cached, no `index.html` fallback for missing assets or unknown API routes, the 1 MB body limit, concurrent requests).
+
+```bash
+docker compose up --build --detach --wait
+node --test "e2e/*.test.mjs"
+docker compose down
+```
+
+Set `E2E_BASE_URL` to test another address (default `http://localhost:3000`).
+
 ## Testing and coverage
 
 _TBD_ — how to run the tests and produce coverage reports for both layers.
@@ -144,7 +159,7 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every pull reques
 
 - **`backend`:** `gofmt` check, `go vet ./...` and `go test ./...` (Go version read from `backend/go.mod`).
 - **`frontend`:** `npm ci`, `npm run lint`, `npm test` and `npm run build` (Node 22).
-- **`docker`:** builds both images, starts the stack with `docker compose up --wait` (so both healthchecks must pass) and sends a real request through nginx.
+- **`docker`:** builds both images, starts the stack with `docker compose up --wait` (so both healthchecks must pass), runs the end-to-end tests through nginx and checks that nginx answers `502` while still serving the app when the backend is down.
 
 To make them mandatory, require the `backend`, `frontend` and `docker` status checks in the branch protection rule of `main`. The same commands can be run locally from `backend/` and `frontend/`.
 
@@ -170,7 +185,7 @@ Decisions taken so far (more will be added as the remaining branches land).
 
 ### API design
 
-- **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (plus `/percentage`; `/power` is next). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
+- **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (plus `/percentage` and `/power`). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
 - **`POST` with a JSON body, not `GET`.** Operands are decimal strings, which are cleaner in a body than in a query string.
 - **Thin, explicit routing.** The domain exposes pure functions with the same shape per arity. The router maps each route to a generic handler, so adding an operation is one domain function plus one route line. Binary operations take `{a, b}` and unary ones take `{value}`, each with its own generic handler.
 - **Two classes of failure, two status codes.** `400` means the request itself is malformed (bad JSON, missing or invalid operand); `422` means it is well formed but mathematically impossible (division by zero). Every error has the same `{"error": {"code", "message"}}` body, and clients should branch on `code`, not on `message`.

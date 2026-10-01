@@ -98,6 +98,14 @@
   background: #fff;
 }
 
+.key--full {
+  grid-column: span 4;
+  aspect-ratio: auto;
+  border-radius: 999px;
+  padding: 0.35rem 0;
+  font-size: 1.6rem;
+}
+
 .key--wide {
   grid-column: span 2;
   aspect-ratio: auto;

@@ -16,6 +16,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   division_by_zero: 'Cannot divide by zero',
   invalid_operand: 'Invalid number',
   invalid_request: 'Invalid request',
+  invalid_exponent: 'Invalid exponent',
   internal_error: 'Server error',
   network_error: 'Cannot reach the server',
   operand_too_long: 'Number too long',

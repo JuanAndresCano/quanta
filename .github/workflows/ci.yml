@@ -79,13 +79,15 @@ jobs:
         # --wait blocks until both services report healthy (or fails).
         run: docker compose up --build --detach --wait
 
-      - name: Smoke test through nginx
+      - name: End-to-end tests through nginx
+        run: node --test "e2e/*.test.mjs"
+
+      - name: With the backend down, nginx answers 502 and still serves the app
         run: |
-          curl --fail --silent localhost:3000/ > /dev/null
-          result="$(curl --fail --silent -X POST localhost:3000/api/v1/add \
-            -H 'Content-Type: application/json' -d '{"a":"0.1","b":"0.2"}')"
-          echo "$result"
-          test "$result" = '{"result":"0.3"}'
+          docker compose stop backend
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' -X POST             localhost:3000/api/v1/add -H 'Content-Type: application/json' -d '{"a":"1","b":"1"}')"
+          test "$status" = 502
+          curl --fail --silent --output /dev/null localhost:3000/
 
       - name: Show logs on failure
         if: failure()

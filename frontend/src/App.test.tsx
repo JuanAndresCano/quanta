@@ -26,6 +26,7 @@ const KEY_NAMES: Record<string, string> = {
   '-': 'subtract',
   '*': 'multiply',
   '/': 'divide',
+  '^': 'power',
   '=': 'equals',
   '.': 'decimal point',
   '~': 'toggle sign',
@@ -239,6 +240,27 @@ describe('through the API client', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/v1/percentage')
     expect(init.body).toBe('{"value":"12.5"}')
+  })
+
+  it('sends power as a binary request and shows the result', async () => {
+    const fetchMock = stubBackend(200, { result: '1024' })
+    const { press, display } = setup(apiCalculate)
+
+    await press('2', '^', '1', '0', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('1,024'))
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/power')
+    expect(init.body).toBe('{"a":"2","b":"10"}')
+  })
+
+  it('shows the friendly message for a 422 invalid_exponent', async () => {
+    stubBackend(422, { error: { code: 'invalid_exponent', message: 'invalid exponent: ...' } })
+    const { press, display } = setup(apiCalculate)
+
+    await press('2', '^', '0', '.', '5', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('Invalid exponent'))
   })
 
   it('shows a 16-decimal division result untouched', async () => {

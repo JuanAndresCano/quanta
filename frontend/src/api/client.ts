@@ -6,6 +6,7 @@ const BACKEND_ERROR_CODES: readonly ErrorCode[] = [
   'invalid_request',
   'invalid_operand',
   'division_by_zero',
+  'invalid_exponent',
   'internal_error',
 ]
 

@@ -5,18 +5,19 @@ export const MAX_DIGITS = 12
 export const MAX_OPERAND_LENGTH = 64
 
 /** Operator names match the backend routes: `POST /api/v1/<operator>`. */
-export type Operator = 'add' | 'subtract' | 'multiply' | 'divide'
+export type Operator = 'add' | 'subtract' | 'multiply' | 'divide' | 'power'
 
 export type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 
 /**
- * Failures the calculator can show. The first four mirror the backend
- * `error.code` values; the last two are produced on the client.
+ * Failures the calculator can show. All but the last two mirror the backend
+ * `error.code` values; `network_error` and `operand_too_long` are produced on the client.
  */
 export type ErrorCode =
   | 'division_by_zero'
   | 'invalid_operand'
   | 'invalid_request'
+  | 'invalid_exponent'
   | 'internal_error'
   | 'network_error'
   | 'operand_too_long'

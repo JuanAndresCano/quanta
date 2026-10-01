@@ -14,11 +14,12 @@ const OPERATORS: Record<string, Operator> = {
   '-': 'subtract',
   '*': 'multiply',
   '/': 'divide',
+  '^': 'power',
 }
 
 /**
  * Tiny DSL to keep the tables readable: digits, `.`, `~` (toggle sign),
- * `+ - * /` (operators), `%` (percent), `=` (equals) and `C` (clear).
+ * `+ - * / ^` (operators), `%` (percent), `=` (equals) and `C` (clear).
  */
 function keys(input: string): Action[] {
   return [...input].map((ch): Action => {
@@ -307,5 +308,27 @@ describe('percent', () => {
   it('rejects a value longer than the backend accepts', () => {
     const state = answer(press('7+3='), '1'.repeat(MAX_OPERAND_LENGTH + 1))
     expect(press('%', state)).toMatchObject({ error: 'operand_too_long', pending: null })
+  })
+})
+
+describe('power', () => {
+  it.each([
+    { input: '2^10=', want: { operator: 'power', a: '2', b: '10', next: null } },
+    { input: '2^3~=', want: { operator: 'power', a: '2', b: '-3', next: null } },
+    { input: '1.5^2.=', want: { operator: 'power', a: '1.5', b: '2', next: null } },
+    { input: '5~^2=', want: { operator: 'power', a: '-5', b: '2', next: null } },
+    { input: '2^=', want: { operator: 'power', a: '2', b: '2', next: null } },
+  ])('"$input" requests the power', ({ input, want }) => {
+    expect(press(input).pending).toEqual(want)
+  })
+
+  it('chains from left to right like the other operators', () => {
+    const state = press('2^3+')
+    expect(state.pending).toEqual({ operator: 'power', a: '2', b: '3', next: 'add' })
+    expect(answer(state, '8')).toMatchObject({ accumulator: '8', operator: 'add', display: '8' })
+  })
+
+  it('replaces a power operator pressed twice', () => {
+    expect(press('2^*')).toMatchObject({ operator: 'multiply', pending: null })
   })
 })
