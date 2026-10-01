@@ -28,7 +28,7 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
   - [x] `App` uses the real client; `stubClient.ts` removed
   - [x] Vite dev proxy `/api` to `localhost:8080`
   - [x] Verified in the browser against the real backend (success, `1/0`, long decimals, backend down)
-- [ ] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
+- [x] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
 - [ ] `feat/advanced-operations`: see "Advanced operations" below
 - [ ] `feat/ci`: GitHub Actions workflow
 - [ ] `feat/docs-coverage`: final README, coverage summary, prompts
@@ -77,8 +77,8 @@ Whatever the route, the work would be: domain function, `422` with its own code 
 ## Docker and environment
 
 - [x] Backend image: multi-stage, non-root, 16 MB, healthcheck, graceful stop.
-- [ ] Frontend image: nginx serves the build and proxies `/api` to the backend service; backend URL configurable.
-- [ ] `docker compose up` runs both; each image also builds and runs on its own.
+- [x] Frontend image: nginx serves the build and proxies `/api` to the backend service; backend URL configurable.
+- [x] `docker compose up` runs both; each image also builds and runs on its own.
 - [x] Vite dev server proxies `/api` to `localhost:8080`.
 
 ## CI (`feat/ci`)
