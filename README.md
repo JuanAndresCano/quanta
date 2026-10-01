@@ -159,7 +159,7 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) runs on every pull reques
 
 - **`backend`:** `gofmt` check, `go vet ./...` and `go test ./...` (Go version read from `backend/go.mod`).
 - **`frontend`:** `npm ci`, `npm run lint`, `npm test` and `npm run build` (Node 22).
-- **`docker`:** builds both images, starts the stack with `docker compose up --wait` (so both healthchecks must pass), runs the end-to-end tests through nginx and checks that nginx answers `502` while still serving the app when the backend is down.
+- **`docker`:** builds both images, starts the stack with `docker compose up --wait` (so both healthchecks must pass), runs the end-to-end tests through nginx and checks that nginx fails fast with a gateway error (`502` or `504`) while still serving the app when the backend is down.
 
 To make them mandatory, require the `backend`, `frontend` and `docker` status checks in the branch protection rule of `main`. The same commands can be run locally from `backend/` and `frontend/`.
 
