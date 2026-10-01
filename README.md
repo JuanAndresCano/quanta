@@ -35,15 +35,56 @@ _TBD_ — setup, running the backend, running the frontend, and running with Doc
 
 ## API
 
-_TBD_ — full endpoint reference and `curl` examples. Planned contract:
+Base path: `/api/v1`. Every operation is a `POST` with a JSON body. Operands are **strings** holding plain decimal numbers (`"12"`, `"-0.5"`; no exponent notation, max 64 characters) so no precision is lost on the wire.
 
-```
-POST /api/v1/add      {"a": "0.1", "b": "0.2"}  ->  200 {"result": "0.3"}
-POST /api/v1/sqrt     {"value": "9"}            ->  200 {"result": "3"}   (optional)
-POST /api/v1/divide   {"a": "1", "b": "0"}      ->  422 {"error": {"code": "division_by_zero", "message": "..."}}
+| Endpoint | Body | Result |
+|---|---|---|
+| `POST /api/v1/add` | `{"a": "0.1", "b": "0.2"}` | `a + b` |
+| `POST /api/v1/subtract` | `{"a": "5", "b": "3"}` | `a - b` |
+| `POST /api/v1/multiply` | `{"a": "4", "b": "3"}` | `a * b` |
+| `POST /api/v1/divide` | `{"a": "1", "b": "3"}` | `a / b`, rounded to 16 decimal places |
+| `GET /healthz` | - | `{"status": "ok"}` |
+
+Success (`200`):
+
+```json
+{"result": "0.3"}
 ```
 
-Malformed requests (invalid JSON, missing or non-numeric operands) return `400`; valid requests that are mathematically impossible (e.g. division by zero) return `422`.
+Errors always have the same shape:
+
+```json
+{"error": {"code": "division_by_zero", "message": "division by zero"}}
+```
+
+| Status | `code` | When |
+|---|---|---|
+| `400` | `invalid_request` | Body is not valid JSON, an operand is missing, or an operand is not a JSON string |
+| `400` | `invalid_operand` | An operand is not a plain decimal number (or is too long) |
+| `422` | `division_by_zero` | The request is well formed but mathematically impossible |
+| `404` | - | Unknown operation |
+| `500` | `internal_error` | Unexpected failure |
+
+Examples:
+
+```bash
+curl -s -X POST localhost:8080/api/v1/add \
+  -H 'Content-Type: application/json' -d '{"a": "0.1", "b": "0.2"}'
+# {"result":"0.3"}
+
+curl -s -X POST localhost:8080/api/v1/divide \
+  -H 'Content-Type: application/json' -d '{"a": "1", "b": "0"}'
+# {"error":{"code":"division_by_zero","message":"division by zero"}}
+```
+
+Backend configuration (environment variables):
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `8080` | Port the server listens on |
+| `CORS_ALLOWED_ORIGINS` | _(empty)_ | Comma-separated origins allowed by CORS. Empty means no CORS headers, which is correct behind a same-origin proxy |
+
+Run the backend with `cd backend && go run ./cmd/server`.
 
 ## Testing and coverage
 
