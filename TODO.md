@@ -17,11 +17,12 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
 - [x] `feat/backend-docker`
 - [ ] `feat/frontend-ui`: iOS-style keypad, display and state, no real backend yet
   - [x] Pure reducer (`src/calculator/`) with table-driven tests
-  - [ ] `useCalculator` hook: effect that sends the `pending` request and dispatches `resolve` / `fail`; ignore stale answers (cancel in the effect cleanup, so an answer from before an AC cannot resolve a newer request)
-  - [ ] Components (`Display`, `Keypad`, `Key`), iOS styling, responsive layout
-  - [ ] Display formatting (`format.ts`): thousands separators and font shrinking, display only
-  - [ ] Component tests (Vitest + Testing Library + jsdom)
-  - [ ] Remove the Vite template content (`App.tsx`, CSS, assets)
+  - [x] `useCalculator` hook: sends the `pending` request, dispatches `resolve` / `fail`, aborts on AC and ignores stale answers
+  - [x] Components (`Display`, `Keypad`, `Key`), iOS styling, responsive layout
+  - [x] Display formatting (`format.ts`): thousands separators and font shrinking, display only
+  - [x] Component tests (Vitest + Testing Library + jsdom)
+  - [x] Remove the Vite template content (`App.tsx`, CSS, assets)
+  - [ ] Temporary `stubCalculate` (`src/api/stubClient.ts`, always answers `42`) is replaced by the real client in `feat/frontend-api-integration`
 - [ ] `feat/frontend-api-integration`: API client, loading and error handling against the real backend, Vite proxy for `/api`
 - [ ] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
 - [ ] `feat/advanced-operations`: see "Advanced operations" below
@@ -37,7 +38,7 @@ The API takes and returns numbers as strings (see "Numeric precision" in the REA
 - [x] Normalize input to the accepted format `^-?\d+(\.\d+)?$` before sending: `.5` becomes `0.5`, `5.` becomes `5`, `-0` becomes `0` (`normalizeOperand`).
 - [x] Cap the number of digits the user can type (`MAX_DIGITS = 12`).
 - [x] Results longer than 64 characters: reusing one as an operand shows `operand_too_long` instead of calling the backend.
-- [ ] Format only for display (thousands separators, shrinking the font), never for the value that is kept and sent.
+- [x] Format only for display (thousands separators, shrinking the font), never for the value that is kept and sent.
 - [ ] Branch on `error.code`, not on `error.message`: `invalid_request`, `invalid_operand` (`400`), `division_by_zero` (`422`), `internal_error` (`500`), plus client-side `network_error` and `operand_too_long`. Show a friendly message for each.
 - [ ] Division results arrive rounded to 16 decimal places without trailing zeros; make sure the display handles long decimals.
 - [ ] Add a test that proves `0.1 + 0.2` reaches the display as `0.3` through the API client.
@@ -47,21 +48,27 @@ The API takes and returns numbers as strings (see "Numeric precision" in the REA
 Decisions taken:
 
 - `percentage` is mandatory (it completes the iOS keypad): `POST /api/v1/percentage` with `{"value": "..."}` returns `value / 100`.
-- `power` and `sqrt` are implemented **only if `shopspring/decimal` provides a native method for them**. No hand-written numeric algorithms (no Newton-Raphson); if the library does not support it out of the box, the operation is dropped to protect the timebox.
+- `power` is implemented only through a native `shopspring/decimal` method. No hand-written numeric algorithms (no Newton-Raphson); if the library does not support it out of the box, the operation is dropped to protect the timebox.
 - `power` is limited to integer exponents with `|b| <= 1000`; a fractional or out-of-range exponent is a `422`.
+- **`sqrt` is out of scope for now.** `shopspring/decimal` v1.4.0 has no `Sqrt` method (see "Parked: square root" below).
 
-Findings so far (`shopspring/decimal` v1.4.0):
-
-- `PowInt32` exists, so `power` qualifies.
-- There is no `Sqrt` method. The only possible route is `Pow` with exponent `0.5`; decide whether that counts as native support before implementing it.
+Findings (`shopspring/decimal` v1.4.0): `PowInt32` exists, so `power` qualifies.
 
 Tasks:
 
-- [ ] Unary handler (`{"value": "..."}`) in the API layer.
-- [ ] `percentage` in the domain, API, tests and README; reducer action and `%` key in the frontend.
-- [ ] `power`: bounded exponent, error code and README entry.
-- [ ] `sqrt`: only if the decision above says yes; negative input is a domain error (`422`) with its own code.
+- [ ] Unary handler (`{"value": "..."}`) in the API layer (needed by `percentage`).
+- [ ] `percentage` in the domain, API, tests and README; reducer action and enable the `%` key in the frontend (it is rendered disabled today).
+- [ ] `power`: bounded exponent, error code and README entry; frontend key and reducer support (binary operator).
 - [ ] Update the API table, error table and design decisions in the README.
+
+### Parked: square root
+
+Only revisit it if there is time left after `percentage` and `power` are implemented and tested. Options to evaluate then, from least to most work:
+
+1. `Pow` with exponent `0.5` (`PowWithPrecision`), if its precision and cost are acceptable. Still library-native, so it respects the "no manual algorithms" rule.
+2. A manual algorithm (Newton-Raphson), which the current rules rule out unless the owner decides otherwise.
+
+Whatever the route, the work would be: domain function, `422` with its own code for negative input, a unary route, README entries, tests, and a `√` key plus reducer action in the frontend.
 
 ## Docker and environment
 

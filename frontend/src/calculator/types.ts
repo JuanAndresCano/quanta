@@ -31,6 +31,16 @@ export interface PendingRequest {
 }
 
 /**
+ * Computes one operation. Operands and the result are decimal strings. It
+ * rejects with a `CalculationError` for known failures; any other rejection
+ * is treated as a network error.
+ */
+export type CalculateFn = (
+  request: Pick<PendingRequest, 'operator' | 'a' | 'b'>,
+  signal: AbortSignal,
+) => Promise<string>
+
+/**
  * Every numeric value is a string, from the keypad to the display to the
  * request: nothing here is ever converted to a JS number.
  */
