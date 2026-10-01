@@ -1,0 +1,481 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>server: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/JuanAndresCano/quanta/backend/cmd/server/main.go (0.0%)</option>
+				
+				<option value="file1">github.com/JuanAndresCano/quanta/backend/internal/api/dto.go (100.0%)</option>
+				
+				<option value="file2">github.com/JuanAndresCano/quanta/backend/internal/api/handler.go (83.3%)</option>
+				
+				<option value="file3">github.com/JuanAndresCano/quanta/backend/internal/api/router.go (100.0%)</option>
+				
+				<option value="file4">github.com/JuanAndresCano/quanta/backend/internal/api/unary.go (85.7%)</option>
+				
+				<option value="file5">github.com/JuanAndresCano/quanta/backend/internal/calculator/basic.go (100.0%)</option>
+				
+				<option value="file6">github.com/JuanAndresCano/quanta/backend/internal/calculator/power.go (92.3%)</option>
+				
+				<option value="file7">github.com/JuanAndresCano/quanta/backend/internal/calculator/unary.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "context"
+        "errors"
+        "log"
+        "net/http"
+        "os"
+        "os/signal"
+        "strings"
+        "syscall"
+        "time"
+
+        "github.com/gin-gonic/gin"
+
+        "github.com/JuanAndresCano/quanta/backend/internal/api"
+)
+
+func main() <span class="cov0" title="0">{
+        if os.Getenv(gin.EnvGinMode) == "" </span><span class="cov0" title="0">{
+                gin.SetMode(gin.ReleaseMode)
+        }</span>
+
+        <span class="cov0" title="0">srv := &amp;http.Server{
+                Addr:              ":" + getEnv("PORT", "8080"),
+                Handler:           api.NewRouter(splitList(os.Getenv("CORS_ALLOWED_ORIGINS"))),
+                ReadHeaderTimeout: 5 * time.Second,
+        }
+
+        go func() </span><span class="cov0" title="0">{
+                log.Printf("calculator backend listening on %s", srv.Addr)
+                if err := srv.ListenAndServe(); err != nil &amp;&amp; !errors.Is(err, http.ErrServerClosed) </span><span class="cov0" title="0">{
+                        log.Fatalf("server error: %v", err)
+                }</span>
+        }()
+
+        <span class="cov0" title="0">stop := make(chan os.Signal, 1)
+        signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+        &lt;-stop
+
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+        if err := srv.Shutdown(ctx); err != nil </span><span class="cov0" title="0">{
+                log.Printf("graceful shutdown failed: %v", err)
+                return
+        }</span>
+        <span class="cov0" title="0">log.Println("server stopped")</span>
+}
+
+func getEnv(key, fallback string) string <span class="cov0" title="0">{
+        if v := os.Getenv(key); v != "" </span><span class="cov0" title="0">{
+                return v
+        }</span>
+        <span class="cov0" title="0">return fallback</span>
+}
+
+// splitList parses a comma-separated list, ignoring blanks.
+func splitList(s string) []string <span class="cov0" title="0">{
+        var out []string
+        for _, part := range strings.Split(s, ",") </span><span class="cov0" title="0">{
+                if part = strings.TrimSpace(part); part != "" </span><span class="cov0" title="0">{
+                        out = append(out, part)
+                }</span>
+        }
+        <span class="cov0" title="0">return out</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package api
+
+import (
+        "fmt"
+        "regexp"
+
+        "github.com/shopspring/decimal"
+)
+
+// Error codes returned in the API error body.
+const (
+        codeInvalidRequest  = "invalid_request"
+        codeInvalidOperand  = "invalid_operand"
+        codeDivisionByZero  = "division_by_zero"
+        codeInvalidExponent = "invalid_exponent"
+        codeInternal        = "internal_error"
+)
+
+// maxOperandLength bounds the size of a single operand string.
+const maxOperandLength = 64
+
+// operandPattern accepts plain decimal notation only. Exponent notation such
+// as "1e999999999" is rejected on purpose: it is tiny on the wire but can make
+// the decimal library allocate huge numbers.
+var operandPattern = regexp.MustCompile(`^-?\d+(\.\d+)?$`)
+
+// binaryRequest is the body of every binary operation (add, subtract, ...).
+// Operands are JSON strings to preserve decimal precision.
+type binaryRequest struct {
+        A string `json:"a" binding:"required"`
+        B string `json:"b" binding:"required"`
+}
+
+type resultResponse struct {
+        Result string `json:"result"`
+}
+
+type errorBody struct {
+        Code    string `json:"code"`
+        Message string `json:"message"`
+}
+
+type errorResponse struct {
+        Error errorBody `json:"error"`
+}
+
+func newErrorResponse(code, message string) errorResponse <span class="cov8" title="1">{
+        return errorResponse{Error: errorBody{Code: code, Message: message}}
+}</span>
+
+// parseOperand converts a request string into a decimal, naming the offending
+// field in the error message.
+func parseOperand(field, value string) (decimal.Decimal, error) <span class="cov8" title="1">{
+        if len(value) &gt; maxOperandLength || !operandPattern.MatchString(value) </span><span class="cov8" title="1">{
+                return decimal.Decimal{}, fmt.Errorf("%q must be a decimal number such as \"12\" or \"-0.5\" (max %d characters)", field, maxOperandLength)
+        }</span>
+        <span class="cov8" title="1">return decimal.NewFromString(value)</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package api
+
+import (
+        "errors"
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+        "github.com/shopspring/decimal"
+
+        "github.com/JuanAndresCano/quanta/backend/internal/calculator"
+)
+
+// binaryOperation is the shape of every two-operand domain function.
+type binaryOperation func(a, b decimal.Decimal) (decimal.Decimal, error)
+
+// binaryHandler adapts a domain operation to a Gin handler: it parses and
+// validates the body, runs the operation and maps domain errors to HTTP.
+func binaryHandler(op binaryOperation) gin.HandlerFunc <span class="cov8" title="1">{
+        return func(c *gin.Context) </span><span class="cov8" title="1">{
+                var req binaryRequest
+                if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                        c.JSON(http.StatusBadRequest, newErrorResponse(codeInvalidRequest,
+                                `body must be a JSON object with string fields "a" and "b"`))
+                        return
+                }</span>
+
+                <span class="cov8" title="1">a, err := parseOperand("a", req.A)
+                if err != nil </span><span class="cov8" title="1">{
+                        c.JSON(http.StatusBadRequest, newErrorResponse(codeInvalidOperand, err.Error()))
+                        return
+                }</span>
+                <span class="cov8" title="1">b, err := parseOperand("b", req.B)
+                if err != nil </span><span class="cov0" title="0">{
+                        c.JSON(http.StatusBadRequest, newErrorResponse(codeInvalidOperand, err.Error()))
+                        return
+                }</span>
+
+                <span class="cov8" title="1">result, err := op(a, b)
+                if err != nil </span><span class="cov8" title="1">{
+                        writeDomainError(c, err)
+                        return
+                }</span>
+                <span class="cov8" title="1">c.JSON(http.StatusOK, resultResponse{Result: result.String()})</span>
+        }
+}
+
+// writeDomainError translates a domain error into an HTTP response.
+func writeDomainError(c *gin.Context, err error) <span class="cov8" title="1">{
+        switch </span>{
+        case errors.Is(err, calculator.ErrDivisionByZero):<span class="cov8" title="1">
+                c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeDivisionByZero, err.Error()))</span>
+        case errors.Is(err, calculator.ErrInvalidExponent):<span class="cov8" title="1">
+                c.JSON(http.StatusUnprocessableEntity, newErrorResponse(codeInvalidExponent, err.Error()))</span>
+        default:<span class="cov0" title="0">
+                _ = c.Error(err)
+                c.JSON(http.StatusInternalServerError, newErrorResponse(codeInternal, "internal server error"))</span>
+        }
+}
+
+func healthHandler(c *gin.Context) <span class="cov8" title="1">{
+        c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}</span>
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Package api is the HTTP layer: routing, request validation and mapping of
+// domain results and errors to JSON responses.
+package api
+
+import (
+        "github.com/gin-contrib/cors"
+        "github.com/gin-gonic/gin"
+
+        "github.com/JuanAndresCano/quanta/backend/internal/calculator"
+)
+
+// NewRouter builds the HTTP router. When allowedOrigins is empty no CORS
+// headers are sent, which is the right default behind a same-origin proxy.
+func NewRouter(allowedOrigins []string) *gin.Engine <span class="cov8" title="1">{
+        r := gin.New()
+        r.Use(gin.Logger(), gin.Recovery())
+        _ = r.SetTrustedProxies(nil)
+
+        if len(allowedOrigins) &gt; 0 </span><span class="cov8" title="1">{
+                r.Use(cors.New(cors.Config{
+                        AllowOrigins: allowedOrigins,
+                        AllowMethods: []string{"GET", "POST", "OPTIONS"},
+                        AllowHeaders: []string{"Content-Type"},
+                }))
+        }</span>
+
+        <span class="cov8" title="1">r.GET("/healthz", healthHandler)
+
+        v1 := r.Group("/api/v1")
+        v1.POST("/add", binaryHandler(calculator.Add))
+        v1.POST("/subtract", binaryHandler(calculator.Subtract))
+        v1.POST("/multiply", binaryHandler(calculator.Multiply))
+        v1.POST("/divide", binaryHandler(calculator.Divide))
+        v1.POST("/power", binaryHandler(calculator.Power))
+        v1.POST("/percentage", unaryHandler(calculator.Percentage))
+
+        return r</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package api
+
+import (
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+        "github.com/shopspring/decimal"
+)
+
+// unaryRequest is the body of every one-operand operation (percentage, ...).
+// The operand is a JSON string to preserve decimal precision.
+type unaryRequest struct {
+        Value string `json:"value" binding:"required"`
+}
+
+// unaryOperation is the shape of every one-operand domain function.
+type unaryOperation func(value decimal.Decimal) (decimal.Decimal, error)
+
+// unaryHandler is the one-operand counterpart of binaryHandler.
+func unaryHandler(op unaryOperation) gin.HandlerFunc <span class="cov8" title="1">{
+        return func(c *gin.Context) </span><span class="cov8" title="1">{
+                var req unaryRequest
+                if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov8" title="1">{
+                        c.JSON(http.StatusBadRequest, newErrorResponse(codeInvalidRequest,
+                                `body must be a JSON object with a string field "value"`))
+                        return
+                }</span>
+
+                <span class="cov8" title="1">value, err := parseOperand("value", req.Value)
+                if err != nil </span><span class="cov8" title="1">{
+                        c.JSON(http.StatusBadRequest, newErrorResponse(codeInvalidOperand, err.Error()))
+                        return
+                }</span>
+
+                <span class="cov8" title="1">result, err := op(value)
+                if err != nil </span><span class="cov0" title="0">{
+                        writeDomainError(c, err)
+                        return
+                }</span>
+                <span class="cov8" title="1">c.JSON(http.StatusOK, resultResponse{Result: result.String()})</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Package calculator holds the pure arithmetic domain logic. It knows nothing
+// about HTTP: operations take decimals and return a decimal or a domain error.
+package calculator
+
+import "github.com/shopspring/decimal"
+
+// DivisionScale is the number of decimal places kept when a division does not
+// terminate (e.g. 1/3).
+const DivisionScale = 16
+
+// Add returns a + b.
+func Add(a, b decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        return a.Add(b), nil
+}</span>
+
+// Subtract returns a - b.
+func Subtract(a, b decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        return a.Sub(b), nil
+}</span>
+
+// Multiply returns a * b.
+func Multiply(a, b decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        return a.Mul(b), nil
+}</span>
+
+// Divide returns a / b rounded to DivisionScale decimal places.
+// It returns ErrDivisionByZero when b is zero.
+func Divide(a, b decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        if b.IsZero() </span><span class="cov8" title="1">{
+                return decimal.Decimal{}, ErrDivisionByZero
+        }</span>
+        <span class="cov8" title="1">return a.DivRound(b, DivisionScale), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package calculator
+
+import (
+        "fmt"
+
+        "github.com/shopspring/decimal"
+)
+
+// MaxExponent bounds |b| in Power so a single request cannot ask for an
+// enormous result.
+const MaxExponent = 1000
+
+// Power returns a raised to the integer power b, using the decimal library's
+// own PowInt32. The exponent must be an integer with |b| &lt;= MaxExponent
+// (ErrInvalidExponent otherwise); 0 raised to a negative power is a division
+// by zero, and 0 to the power of 0 is undefined. Negative exponents are
+// rounded to DivisionScale decimal places, like a division.
+func Power(a, b decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        if !b.IsInteger() || b.Abs().GreaterThan(decimal.NewFromInt(MaxExponent)) </span><span class="cov8" title="1">{
+                return decimal.Decimal{}, fmt.Errorf("%w: it must be an integer between -%d and %d", ErrInvalidExponent, MaxExponent, MaxExponent)
+        }</span>
+        <span class="cov8" title="1">exp := int32(b.IntPart())
+
+        if a.IsZero() </span><span class="cov8" title="1">{
+                switch </span>{
+                case exp == 0:<span class="cov8" title="1">
+                        return decimal.Decimal{}, fmt.Errorf("%w: 0 to the power of 0 is undefined", ErrInvalidExponent)</span>
+                case exp &lt; 0:<span class="cov8" title="1">
+                        // PowInt32 would divide by zero here.
+                        return decimal.Decimal{}, ErrDivisionByZero</span>
+                }
+        }
+
+        <span class="cov8" title="1">result, err := a.PowInt32(exp)
+        if err != nil </span><span class="cov0" title="0">{
+                return decimal.Decimal{}, err
+        }</span>
+        <span class="cov8" title="1">if exp &lt; 0 </span><span class="cov8" title="1">{
+                result = result.Round(DivisionScale)
+        }</span>
+        <span class="cov8" title="1">return result, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package calculator
+
+import "github.com/shopspring/decimal"
+
+// Percentage returns value / 100. Moving the decimal point is exact, so unlike
+// a division it never rounds.
+func Percentage(value decimal.Decimal) (decimal.Decimal, error) <span class="cov8" title="1">{
+        return value.Shift(-2), nil
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
