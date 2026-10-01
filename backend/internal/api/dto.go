@@ -9,14 +9,17 @@ import (
 
 // Error codes returned in the API error body.
 const (
-	codeInvalidRequest  = "invalid_request"
-	codeInvalidOperand  = "invalid_operand"
-	codeDivisionByZero  = "division_by_zero"
-	codeInvalidExponent = "invalid_exponent"
-	codeInternal        = "internal_error"
+	codeInvalidRequest     = "invalid_request"
+	codeInvalidOperand     = "invalid_operand"
+	codeDivisionByZero     = "division_by_zero"
+	codeInvalidExponent    = "invalid_exponent"
+	codeNegativeSquareRoot = "negative_square_root"
+	codeResultTooLong      = "result_too_long"
+	codeInternal           = "internal_error"
 )
 
-// maxOperandLength bounds the size of a single operand string.
+// maxOperandLength bounds the size of a single operand string. Results are
+// held to the same bound, so every result can be the operand of the next call.
 const maxOperandLength = 64
 
 // operandPattern accepts plain decimal notation only. Exponent notation such

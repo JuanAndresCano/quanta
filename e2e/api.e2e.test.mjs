@@ -27,6 +27,7 @@ async function post(path, body, { raw = false } = {}) {
 
 const binary = (op, a, b) => post(`/api/v1/${op}`, { a, b })
 const percentage = (value) => post('/api/v1/percentage', { value })
+const sqrt = (value) => post('/api/v1/sqrt', { value })
 
 function expectResult(response, result) {
   assert.equal(response.status, 200, response.text)
@@ -59,7 +60,7 @@ describe('arithmetic is exact and travels as strings', () => {
     expectResult(await binary('multiply', '-5', '0'), '0')
   })
   it('accepts a 64-character operand', async () => {
-    expectResult(await binary('add', '9'.repeat(64), '1'), '1' + '0'.repeat(64))
+    expectResult(await binary('subtract', '9'.repeat(64), '1'), '9'.repeat(63) + '8')
   })
 })
 
@@ -75,6 +76,19 @@ describe('percentage', () => {
     expectError(await post('/api/v1/percentage', { a: '1', b: '2' }), 400, 'invalid_request'))
 })
 
+describe('square root', () => {
+  it('is exact for perfect squares', async () => {
+    expectResult(await sqrt('16'), '4')
+    expectResult(await sqrt('0.25'), '0.5')
+    expectResult(await sqrt('0'), '0')
+  })
+  it('rounds to 16 decimals', async () => expectResult(await sqrt('2'), '1.414213562373095'))
+  it('rejects a negative number with a 422', async () =>
+    expectError(await sqrt('-4'), 422, 'negative_square_root'))
+  it('accepts a 64-character operand', async () =>
+    expectResult(await sqrt('9'.repeat(64)), '1' + '0'.repeat(32)))
+})
+
 describe('power', () => {
   it('raises to positive, zero and negative integer exponents', async () => {
     expectResult(await binary('power', '2', '10'), '1024')
@@ -87,10 +101,14 @@ describe('power', () => {
     expectResult(await binary('power', '1.5', '2'), '2.25')
   })
   it('accepts the exponent limits', async () => {
-    const response = await binary('power', '2', '1000')
-    assert.equal(response.status, 200)
-    assert.equal(response.json.result.length, 302)
     expectResult(await binary('power', '1', '1000'), '1')
+    expectResult(await binary('power', '1', '-1000'), '1')
+  })
+  it('rejects a result longer than 64 characters, like an operand', async () => {
+    expectResult(await binary('power', '2', '212'), '6582018229284824168619876730229402019930943462534319453394436096')
+    expectError(await binary('power', '2', '213'), 422, 'result_too_long')
+    expectError(await binary('power', '2', '1000'), 422, 'result_too_long')
+    expectError(await binary('multiply', '9'.repeat(64), '9'.repeat(64)), 422, 'result_too_long')
   })
   it('rejects exponents out of range or not integer', async () => {
     expectError(await binary('power', '2', '1001'), 422, 'invalid_exponent')
@@ -104,7 +122,7 @@ describe('power', () => {
   it('answers fast for the worst allowed input', async () => {
     const started = Date.now()
     const response = await binary('power', '9'.repeat(64), '1000')
-    assert.equal(response.status, 200)
+    assert.equal(response.status, 422)
     assert.ok(Date.now() - started < 3000, 'took more than 3 seconds')
   })
 })

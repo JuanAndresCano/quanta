@@ -7,8 +7,7 @@ A full-stack calculator: a React + TypeScript frontend that consumes a Go REST A
 | Operation | Priority |
 |---|---|
 | Addition, subtraction, multiplication, division | Required |
-| Exponentiation, percentage | Optional, built |
-| Square root | Optional, not built (the decimal library has no native square root) |
+| Exponentiation, square root, percentage | Optional, all built |
 
 ## Repository layout
 
@@ -103,6 +102,7 @@ Base path: `/api/v1`. Every operation is a `POST` with a JSON body. Operands are
 | `POST /api/v1/multiply` | `{"a": "4", "b": "3"}` | `a * b` |
 | `POST /api/v1/divide` | `{"a": "1", "b": "3"}` | `a / b`, rounded to 16 decimal places |
 | `POST /api/v1/percentage` | `{"value": "12.5"}` | `value / 100`, exact (`0.125`) |
+| `POST /api/v1/sqrt` | `{"value": "2"}` | `√value`, rounded to 16 decimal places (`1.414213562373095`) |
 | `POST /api/v1/power` | `{"a": "2", "b": "10"}` | `a ^ b`, integer exponent with `\|b\| <= 1000`; a negative exponent is rounded to 16 decimal places |
 | `GET /healthz` | - | `{"status": "ok"}` |
 
@@ -124,6 +124,8 @@ Errors always have the same shape:
 | `400` | `invalid_operand` | An operand is not a plain decimal number (or is too long) |
 | `422` | `division_by_zero` | The request is well formed but mathematically impossible (`1 / 0`, or `0` to a negative power) |
 | `422` | `invalid_exponent` | `power` with a fractional exponent, `\|b\| > 1000`, or `0 ^ 0` |
+| `422` | `negative_square_root` | `sqrt` of a negative number |
+| `422` | `result_too_long` | The result has more than 64 characters (for example `2^1000`), so it could not be sent back as an operand |
 | `404` | - | Unknown operation |
 | `500` | `internal_error` | Unexpected failure |
 
@@ -230,11 +232,11 @@ Summary of the last run:
 
 | Part | Coverage |
 |---|---|
-| Backend `internal/calculator` (domain) | 95.0% of statements |
-| Backend `internal/api` (HTTP layer) | 89.3% of statements |
-| Frontend (`src/`) | 99.3% statements, 99.2% branches, 100% functions, 100% lines |
+| Backend `internal/calculator` (domain) | 96.0% of statements |
+| Backend `internal/api` (HTTP layer) | 93.7% of statements |
+| Frontend (`src/`) | 99.4% statements, 99.3% branches, 100% functions, 100% lines |
 
-`backend/cmd/server` (`main`: configuration, wiring and graceful shutdown) has no unit tests, which is why the backend total over all packages is 69.0%; it is exercised by the end-to-end tests and by the container healthcheck. In the HTTP layer the uncovered code is the `500` fallback for unexpected errors.
+`backend/cmd/server` (`main`: configuration, wiring and graceful shutdown) has no unit tests, which is why the backend total over all packages is 74.1%; it is exercised by the end-to-end tests and by the container healthcheck. In the HTTP layer the uncovered code is the `500` fallback for unexpected errors.
 
 ## Continuous integration
 
@@ -262,13 +264,14 @@ The main decisions and the reasons behind them.
 
 - **Exact decimal arithmetic.** The backend computes with `shopspring/decimal`, so `0.1 + 0.2` is exactly `0.3`, which binary floating point cannot do.
 - **Numbers travel as JSON strings, in both directions.** A JSON number would be parsed into a float64 by most clients (including `JSON.parse` in the browser) and the precision would be lost before it reaches the API. Sending a JSON number instead of a string is rejected with `400 invalid_request`.
+- **Results follow the operand limit.** A result longer than 64 characters is a `422 result_too_long`, like a division by zero. Every result can therefore be the operand of the next calculation, and the browser never receives a number it cannot use. Before this rule, a chained `power` could return 64,000 digits, and formatting and drawing that froze the page for several seconds.
 - **Strict operand format.** Operands must match `^-?\d+(\.\d+)?$` and be at most 64 characters: no `+` sign, no `.5` or `5.`, no exponent notation. Exponent notation is rejected on purpose because `"1e999999999"` is tiny on the wire but can make the decimal library allocate huge numbers.
 - **Division rounds to 16 decimal places.** `1/3` returns `0.3333333333333333`. Results are returned without trailing zeros.
 - **Consequences for the frontend.** The frontend must never convert operands or results with `Number()`, `parseFloat` or arithmetic: values live as strings from the keypad to the display and the request. It also has to normalize what the user types into the accepted format (for example `.5` becomes `0.5`, `5.` becomes `5`) and cap the input length.
 
 ### API design
 
-- **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (plus `/percentage` and `/power`). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
+- **One endpoint per operation.** `POST /api/v1/add`, `/subtract`, `/multiply`, `/divide` (plus `/percentage`, `/sqrt` and `/power`). The URL states the intent, each operation has its own typed body (`{a, b}` for binary operations, `{value}` for unary ones), and unknown operations are a plain `404`. A calculator has no real resources, so this is RPC over HTTP either way; per-operation routes keep the contract explicit instead of hiding a `switch` behind a single `/calculate` endpoint.
 - **`POST` with a JSON body, not `GET`.** Operands are decimal strings, which are cleaner in a body than in a query string.
 - **Thin, explicit routing.** The domain exposes pure functions with the same shape per arity. The router maps each route to a generic handler, so adding an operation is one domain function plus one route line. Binary operations take `{a, b}` and unary ones take `{value}`, each with its own generic handler.
 - **Two classes of failure, two status codes.** `400` means the request itself is malformed (bad JSON, missing or invalid operand); `422` means it is well formed but mathematically impossible (division by zero). Every error has the same `{"error": {"code", "message"}}` body, and clients should branch on `code`, not on `message`.
@@ -276,8 +279,8 @@ The main decisions and the reasons behind them.
 ### Operations
 
 - **`percentage` is exact.** `value / 100` is computed by shifting the decimal point (`Shift(-2)`), so it never rounds, unlike a division.
-- **`power` only uses what the decimal library offers.** It relies on `PowInt32`, with no hand-written numeric algorithm. The exponent must be an integer with `|b| <= 1000`, otherwise `422 invalid_exponent`. The library fails on `0^0` (reported as `invalid_exponent`) and would divide by zero for `0` to a negative power, so that case is guarded before the call and reported as `division_by_zero`. A negative exponent is rounded to 16 decimal places, like a division. The worst allowed input (a 64-digit base to the power of 1000) answers in milliseconds.
-- **Square root is not built.** `shopspring/decimal` has no native `Sqrt`, and a hand-written algorithm (for example Newton-Raphson) was ruled out to keep the scope small and the arithmetic delegated to the library. Adding it would take a domain function, a `422` for negative input, a unary route and a key.
+- **`power` only uses what the decimal library offers.** It relies on `PowInt32`, with no hand-written numeric algorithm. The exponent must be an integer with `|b| <= 1000`, otherwise `422 invalid_exponent`. The library fails on `0^0` (reported as `invalid_exponent`) and would divide by zero for `0` to a negative power, so that case is guarded before the call and reported as `division_by_zero`. A negative exponent is rounded to 16 decimal places, like a division. The worst allowed input (a 64-digit base to the power of 1000) is computed in milliseconds and then rejected as `result_too_long`. The largest power of 2 that fits is `2^212`.
+- **`sqrt` uses the standard library.** `shopspring/decimal` has no `Sqrt`, but Go's `math/big.Float` does, so there is still no hand-written numeric algorithm. The value is converted to a 256-bit `big.Float` (about 77 significant digits, more than a 64-character operand needs), its root is taken there, and the decimal library rounds the result to 16 decimal places, like a division. A negative value is `422 negative_square_root`.
 
 ### Frontend
 
@@ -285,8 +288,9 @@ The main decisions and the reasons behind them.
 - **Strings from the keypad to the request.** The state, the display and the requests hold strings only; nothing is converted to a JS number. Typing is capped at 12 digits, and a result longer than 64 characters that is reused as an operand shows "Number too long" instead of calling the backend.
 - **Left-to-right chaining, like iOS.** `2 + 3 ×` computes `2 + 3` before applying the `×`, and `2 + =` computes `2 + 2`. Two operators in a row replace each other.
 - **The keypad locks while a request is in flight.** Only AC works: it aborts the request, and a late answer is ignored.
-- **`%` acts on the display and keeps the pending operator.** `200 + 10 % =` is `200.1`. It is not the iOS behavior, where the percentage is relative to the first operand.
-- **`xʸ` has its own full-width row**, because the iOS keypad has no room for a power key.
+- **`%` behaves like iOS.** After `+` or `−` it is a percentage of the first operand: `200 + 10 %` shows `20`, and `=` gives `220`. After `×`, `÷`, `xʸ`, or with no operator, it is the number's hundredth: `200 × 10 % =` is `20`. The relative case takes two requests (`percentage`, then `multiply`), so the frontend still does no arithmetic of its own.
+- **`√` acts on the display** and keeps the operation in progress: `9 + 16 √ =` is `13`.
+- **`√` and `xʸ` share an extra top row**, because the iOS keypad has no room for them.
 - **Errors are branched on `error.code`.** Each code has a friendly message. Any response that is not the backend's own error body (a gateway error, an HTML page, an empty body) or a failed request is shown as "Cannot reach the server". There are no client timeouts or retries: the user cancels with AC.
 
 ### Docker and nginx
@@ -298,9 +302,9 @@ The main decisions and the reasons behind them.
 
 ### Known limitations
 
-- Square root is not built (see "Operations").
-- `±` pressed right after choosing an operator only changes the display, and after `%` a new operator replaces the pending one instead of evaluating.
+- `±` pressed right after choosing an operator only changes the display, and after `%` or `√` a new operator replaces the pending one instead of evaluating.
 - A result of around 24 digits is wider than a phone screen; the display scrolls horizontally instead of shrinking further.
+- There is no scientific notation: a result longer than 64 characters is an error instead of being shown as, for example, `1.07e301`.
 - There is no authentication or rate limiting, which is out of scope for a calculator.
 
 ## Workflow

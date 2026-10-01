@@ -7,6 +7,8 @@ const BACKEND_ERROR_CODES: readonly ErrorCode[] = [
   'invalid_operand',
   'division_by_zero',
   'invalid_exponent',
+  'negative_square_root',
+  'result_too_long',
   'internal_error',
 ]
 
@@ -20,8 +22,7 @@ const BACKEND_ERROR_CODES: readonly ErrorCode[] = [
  * If `fetch` itself throws, the hook treats it as a `network_error` too.
  */
 export const apiCalculate: CalculateFn = async (request, signal) => {
-  const payload =
-    request.operator === 'percentage' ? { value: request.value } : { a: request.a, b: request.b }
+  const payload = 'value' in request ? { value: request.value } : { a: request.a, b: request.b }
   const response = await fetch(`/api/v1/${request.operator}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

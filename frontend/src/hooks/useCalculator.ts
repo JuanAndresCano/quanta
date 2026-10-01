@@ -24,8 +24,8 @@ export function useCalculator(
 
     const controller = new AbortController()
     const request: CalculationRequest =
-      pending.operator === 'percentage'
-        ? { operator: 'percentage', value: pending.value }
+      'value' in pending
+        ? { operator: pending.operator, value: pending.value }
         : { operator: pending.operator, a: pending.a, b: pending.b }
 
     // Pressing AC aborts the request; its outcome no longer matters, even if

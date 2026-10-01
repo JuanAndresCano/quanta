@@ -19,6 +19,10 @@ func TestPower(t *testing.T) {
 		{name: "decimal base", body: `{"a":"1.5","b":"2"}`, wantStatus: 200, wantResult: "2.25"},
 		{name: "negative exponent", body: `{"a":"2","b":"-2"}`, wantStatus: 200, wantResult: "0.25"},
 		{name: "exponent zero", body: `{"a":"7","b":"0"}`, wantStatus: 200, wantResult: "1"},
+		{name: "largest power of 2 that fits", body: `{"a":"2","b":"212"}`, wantStatus: 200, wantResult: "6582018229284824168619876730229402019930943462534319453394436096"},
+		{name: "one more digit is too long", body: `{"a":"2","b":"213"}`, wantStatus: 422, wantCode: codeResultTooLong},
+		{name: "2^1000 is too long", body: `{"a":"2","b":"1000"}`, wantStatus: 422, wantCode: codeResultTooLong},
+		{name: "tiny result too long", body: `{"a":"0.1","b":"64"}`, wantStatus: 422, wantCode: codeResultTooLong},
 
 		{name: "zero to a negative power", body: `{"a":"0","b":"-1"}`, wantStatus: 422, wantCode: codeDivisionByZero},
 		{name: "zero to the power of zero", body: `{"a":"0","b":"0"}`, wantStatus: 422, wantCode: codeInvalidExponent},

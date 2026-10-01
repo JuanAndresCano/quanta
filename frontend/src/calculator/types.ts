@@ -7,6 +7,9 @@ export const MAX_OPERAND_LENGTH = 64
 /** Operator names match the backend routes: `POST /api/v1/<operator>`. */
 export type Operator = 'add' | 'subtract' | 'multiply' | 'divide' | 'power'
 
+/** One-operand operations; they act on the number on the display. */
+export type UnaryOperator = 'percentage' | 'sqrt'
+
 export type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
 
 /**
@@ -18,6 +21,8 @@ export type ErrorCode =
   | 'invalid_operand'
   | 'invalid_request'
   | 'invalid_exponent'
+  | 'negative_square_root'
+  | 'result_too_long'
   | 'internal_error'
   | 'network_error'
   | 'operand_too_long'
@@ -29,21 +34,30 @@ export interface BinaryRequest {
   b: string
 }
 
-/** The one-operand request: `POST /api/v1/percentage` with `{value}`. */
-export interface PercentageRequest {
-  operator: 'percentage'
+/** A one-operand request: `POST /api/v1/<operator>` with `{value}`. */
+export interface UnaryRequest {
+  operator: UnaryOperator
   value: string
 }
 
-export type CalculationRequest = BinaryRequest | PercentageRequest
+export type CalculationRequest = BinaryRequest | UnaryRequest
 
 /** A request the UI layer must send to the backend. */
 export type PendingRequest =
   | (BinaryRequest & {
       /** Operator to continue with once the result arrives (chained operations). */
       next: Operator | null
+      /**
+       * The result replaces the number on the display and the operation in
+       * progress is kept (the second step of a relative percentage).
+       */
+      operand?: true
     })
-  | (PercentageRequest & { next: null })
+  | (UnaryRequest & {
+      next: null
+      /** For `+` and `−`, the percentage is of this number: `200 + 10 %` is 20. */
+      of?: string
+    })
 
 /**
  * Computes one operation. Operands and the result are decimal strings. It
@@ -73,6 +87,7 @@ export type Action =
   | { type: 'operator'; operator: Operator }
   | { type: 'equals' }
   | { type: 'percent' }
+  | { type: 'sqrt' }
   | { type: 'clear' }
   | { type: 'resolve'; result: string }
   | { type: 'fail'; code: ErrorCode }

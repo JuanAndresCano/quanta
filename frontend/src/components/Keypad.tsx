@@ -29,9 +29,9 @@ export function Keypad({ state, dispatch }: KeypadProps) {
     />
   )
 
-  const operator = (value: Operator, full = false) => (
+  const operator = (value: Operator, slim = false) => (
     <Key
-      full={full}
+      slim={slim}
       label={OPERATOR_KEYS[value].label}
       ariaLabel={OPERATOR_KEYS[value].name}
       variant="operator"
@@ -43,6 +43,14 @@ export function Keypad({ state, dispatch }: KeypadProps) {
 
   return (
     <div className="keypad">
+      <Key
+        label="√"
+        ariaLabel="square root"
+        variant="function"
+        slim
+        disabled={busy}
+        onPress={() => dispatch({ type: 'sqrt' })}
+      />
       {operator('power', true)}
 
       <Key label="AC" ariaLabel="clear" variant="function" onPress={() => dispatch({ type: 'clear' })} />

@@ -31,6 +31,7 @@ const KEY_NAMES: Record<string, string> = {
   '.': 'decimal point',
   '~': 'toggle sign',
   '%': 'percent',
+  r: 'square root',
   C: 'clear',
 }
 
@@ -240,6 +241,60 @@ describe('through the API client', () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('/api/v1/percentage')
     expect(init.body).toBe('{"value":"12.5"}')
+  })
+
+  it('sends square root as {"value": ...} and shows the result', async () => {
+    const fetchMock = stubBackend(200, { result: '1.414213562373095' })
+    const { press, display } = setup(apiCalculate)
+
+    await press('2', 'r')
+
+    await waitFor(() => expect(display()).toHaveTextContent('1.414213562373095'))
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('/api/v1/sqrt')
+    expect(init.body).toBe('{"value":"2"}')
+  })
+
+  it('shows the friendly message for a 422 negative_square_root', async () => {
+    stubBackend(422, { error: { code: 'negative_square_root', message: 'square root of a negative number' } })
+    const { press, display } = setup(apiCalculate)
+
+    await press('4', '~', 'r')
+
+    await waitFor(() => expect(display()).toHaveTextContent('Negative square root'))
+  })
+
+  it('shows the friendly message for a 422 result_too_long', async () => {
+    stubBackend(422, { error: { code: 'result_too_long', message: 'the result has more than 64 characters' } })
+    const { press, display } = setup(apiCalculate)
+
+    await press('2', '^', '1', '0', '0', '0', '=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('Result too long'))
+  })
+
+  it('computes 200 + 10 % = as 220 in three requests, like iOS', async () => {
+    const answers: Record<string, string> = {
+      '/api/v1/percentage': '0.1',
+      '/api/v1/multiply': '20',
+      '/api/v1/add': '220',
+    }
+    const fetchMock = vi.fn((url: string, _init: RequestInit) =>
+      Promise.resolve(new Response(JSON.stringify({ result: answers[url] }), { status: 200 })),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const { press, display } = setup(apiCalculate)
+
+    await press('2', '0', '0', '+', '1', '0', '%')
+    await waitFor(() => expect(display()).toHaveTextContent('20'))
+    await press('=')
+
+    await waitFor(() => expect(display()).toHaveTextContent('220'))
+    expect(fetchMock.mock.calls.map(([url, init]) => [url, init.body])).toEqual([
+      ['/api/v1/percentage', '{"value":"10"}'],
+      ['/api/v1/multiply', '{"a":"200","b":"0.1"}'],
+      ['/api/v1/add', '{"a":"200","b":"20"}'],
+    ])
   })
 
   it('sends power as a binary request and shows the result', async () => {
