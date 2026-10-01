@@ -112,6 +112,27 @@ Configuration is passed as environment variables, for example `docker run -e POR
 
 The image is a multi-stage build: a `golang:1.23-alpine` stage compiles a static binary, and the final `alpine` image only contains that binary. It runs as a non-root user, declares a `HEALTHCHECK` on `/healthz`, and uses the exec form of `ENTRYPOINT` so `docker stop` delivers `SIGTERM` and triggers the server's graceful shutdown.
 
+### Frontend with Docker
+
+The frontend image serves the production build with nginx and forwards `/api` to the backend, so the browser only ever talks to one origin. Its build context is `frontend/`.
+
+```bash
+docker build -t calculator-frontend ./frontend
+docker run --rm -p 3000:8080 -e BACKEND_URL=http://host.docker.internal:8080 calculator-frontend
+```
+
+`BACKEND_URL` is the address nginx proxies `/api` to (default `http://backend:8080`, the service name in the compose file). nginx resolves that host when it starts, so run on its own the container needs a `BACKEND_URL` that resolves, for example the backend published on the host as above; with the unresolvable default it refuses to start.
+
+The image is a multi-stage build: a `node:22-alpine` stage runs `npm ci` and `npm run build`, and the final `nginxinc/nginx-unprivileged` image only contains the static files and the nginx config. It runs as a non-root user and listens on port 8080 inside the container. Hashed files under `/assets/` are cached for a year and `index.html` is never cached.
+
+### Run everything with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+Open http://localhost:3000. Compose starts the backend first and waits for its healthcheck before starting the frontend. Only the frontend is published (port 3000); the backend is reachable from it through the compose network. Stop everything with `docker compose down`.
+
 ## Testing and coverage
 
 _TBD_ — how to run the tests and produce coverage reports for both layers.

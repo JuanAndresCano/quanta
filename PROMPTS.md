@@ -42,3 +42,9 @@ AI tooling (Claude Code) was used while building this project. This file records
 - Wrote the client test-first over a mocked `fetch` (request shape, string operands, every error code, malformed bodies), plus component tests that run the real client end to end for `0.1 + 0.2`, `1 / 3`, `1 / 0` and a failed request.
 - Added the Vite dev proxy for `/api` and removed the temporary stub.
 - Verified against the real backend in the browser: results, chaining, division by zero, recovery, and "Cannot reach the server" with the backend stopped.
+
+## `feat/frontend-docker`
+
+- Planned the branch first: multi-stage build with an unprivileged nginx (non-root, port 8080), a configurable `BACKEND_URL` rendered from nginx's template mechanism, and a compose file that publishes only the frontend and waits for the backend healthcheck.
+- Accepted a trade-off: nginx resolves the backend host at startup, so the image on its own needs a resolvable `BACKEND_URL`. Resolving per request would add complexity the project does not need.
+- Verified end to end: both images build (frontend 55 MB, backend 16 MB), both containers run as non-root and report `healthy`, the app works in the browser through nginx on port 3000, gzip and cache headers are correct, a stopped backend shows "Cannot reach the server", and `docker compose down` finishes in under a second.
