@@ -26,3 +26,11 @@ AI tooling (Claude Code) was used while building this project. This file records
 - Planned the branch (mission, "done" criteria, verification steps) before writing code, and chose an Alpine final image over distroless to keep the healthcheck inside the image.
 - Wrote a multi-stage `backend/Dockerfile` (static build, non-root user, `HEALTHCHECK`, exec-form `ENTRYPOINT`) and a `.dockerignore`.
 - Verified the image end to end: build, 16 MB size, non-root user, endpoints, `healthy` status and a clean `docker stop` (exit code 0 in about 1 second).
+
+## `feat/frontend-ui`
+
+- Designed the calculator as a pure reducer (string-only state, `pending` request instead of side effects) and wrote it test-first with table-driven tests and a small key-sequence DSL (`'2+3='`).
+- Decided the interaction rules: left-to-right chaining like iOS, `2 + =` computes `2 + 2`, keypad locked while a request is in flight (only AC cancels it), digit cap of 12, and an `operand_too_long` error for results above 64 characters.
+- Accepted a deliberate simplification: `±` pressed right after choosing an operator only changes the display.
+- Built the `useCalculator` hook (aborts the request on AC, ignores stale answers), the iOS-style keypad and display, display-only number formatting, and component tests with Testing Library.
+- Parked square root: `shopspring/decimal` has no native `Sqrt`, so it stays out of scope unless time remains after `percentage` and `power`.
