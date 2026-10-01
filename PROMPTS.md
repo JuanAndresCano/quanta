@@ -48,3 +48,9 @@ AI tooling (Claude Code) was used while building this project. This file records
 - Planned the branch first: multi-stage build with an unprivileged nginx (non-root, port 8080), a configurable `BACKEND_URL` rendered from nginx's template mechanism, and a compose file that publishes only the frontend and waits for the backend healthcheck.
 - Accepted a trade-off: nginx resolves the backend host at startup, so the image on its own needs a resolvable `BACKEND_URL`. Resolving per request would add complexity the project does not need.
 - Verified end to end: both images build (frontend 55 MB, backend 16 MB), both containers run as non-root and report `healthy`, the app works in the browser through nginx on port 3000, gzip and cache headers are correct, a stopped backend shows "Cannot reach the server", and `docker compose down` finishes in under a second.
+
+## `feat/ci`
+
+- Chose CI before the advanced operations to have a safety net while touching working code, and kept it minimal: one workflow on pull requests to `main`, with parallel `backend` (gofmt, vet, test) and `frontend` (lint, test, build) jobs.
+- Ran every step locally first. `gofmt -l` flagged all Go files only because the Windows checkout had CRLF line endings (clean once normalized to LF), so a `.gitattributes` with `eol=lf` was added.
+- Added a third `docker` job (compose build, `--wait` for both healthchecks, and a real request through nginx) so the Docker setup is verified end to end on every pull request.

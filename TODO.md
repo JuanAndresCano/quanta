@@ -30,7 +30,7 @@ Working checklist so no detail gets lost. Remove items (or the whole file) befor
   - [x] Verified in the browser against the real backend (success, `1/0`, long decimals, backend down)
 - [x] `feat/frontend-docker`: Dockerfile with nginx (static files + `/api` proxy) and a root `docker-compose.yml`
 - [ ] `feat/advanced-operations`: see "Advanced operations" below
-- [ ] `feat/ci`: GitHub Actions workflow
+- [x] `feat/ci`: GitHub Actions workflow
 - [ ] `feat/docs-coverage`: final README, coverage summary, prompts
 
 ## Frontend must respect the string contract
@@ -83,10 +83,11 @@ Whatever the route, the work would be: domain function, `422` with its own code 
 
 ## CI (`feat/ci`)
 
-- [ ] Workflow triggered on pull requests to `main`.
-- [ ] Backend job: `gofmt` check, `go vet`, `go test ./...` (Go version taken from `go.mod`).
-- [ ] Frontend job: `npm ci`, `npm run lint`, `npm test`, `npm run build` (Node 22).
-- [ ] Mention the required checks in the README, and note that the branch protection rule on `main` can require them.
+- [x] Workflow triggered on pull requests to `main`.
+- [x] Backend job: `gofmt` check, `go vet`, `go test ./...` (Go version taken from `go.mod`).
+- [x] Frontend job: `npm ci`, `npm run lint`, `npm test`, `npm run build` (Node 22).
+- [x] Docker job: build both images, `docker compose up --wait` and a smoke test through nginx.
+- [x] Mention the required checks in the README, and note that the branch protection rule on `main` can require them.
 
 ## Documentation
 
